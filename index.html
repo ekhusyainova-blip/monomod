@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>MONOMOD — один интерфейс, модифицированный под тебя</title>
+  <meta name="description" content="MONOMOD — одна страница, которая перестраивается под каждого человека.">
+  <meta name="theme-color" content="#0e0e0e">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111'/%3E%3Ctext x='32' y='44' font-size='34' font-family='Arial' font-weight='700' text-anchor='middle' fill='%23fff'%3EM%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="./" aria-label="MONOMOD — на главную">MONO<span>MOD</span></a>
+    <div class="topbar-actions">
+      <button id="themeToggle" class="ghost" type="button" title="Тема">◐ <span id="themeLabel">Авто</span></button>
+      <button id="editBtn" class="ghost hidden" type="button">Изменить</button>
+    </div>
+  </header>
+
+  <div id="sharedBanner" class="banner hidden" role="status">
+    <span id="sharedText"></span>
+    <span class="banner-actions">
+      <button id="adoptBtn" type="button" class="small">Сделать своей</button>
+      <button id="ownBtn" type="button" class="small ghost">Создать свою</button>
+    </span>
+  </div>
+
+  <main id="app">
+    <!-- Онбординг -->
+    <section id="onboarding" class="onboarding hidden" aria-live="polite">
+      <form id="obForm" novalidate>
+        <div class="step" data-step="0">
+          <p class="eyebrow">Шаг 1 из 3</p>
+          <h1>Как тебя зовут?</h1>
+          <input id="obName" name="name" type="text" maxlength="40" autocomplete="given-name" placeholder="Имя" required>
+        </div>
+        <div class="step hidden" data-step="1">
+          <p class="eyebrow">Шаг 2 из 3</p>
+          <h1>Твоя главная цель?</h1>
+          <input id="obGoal" name="goal" type="text" maxlength="80" placeholder="Например: выучить английский" required>
+          <div class="chips" id="goalChips"></div>
+        </div>
+        <div class="step hidden" data-step="2">
+          <p class="eyebrow">Шаг 3 из 3</p>
+          <h1>Любимый цвет?</h1>
+          <div class="swatches" id="swatches" role="radiogroup" aria-label="Цвет акцента"></div>
+          <label class="custom-color">
+            <input id="obColor" type="color" value="#7c5cff"> Свой цвет
+          </label>
+        </div>
+        <p id="obError" class="error" role="alert"></p>
+        <div class="ob-nav">
+          <button id="obBack" type="button" class="ghost">Назад</button>
+          <button id="obNext" type="submit">Дальше →</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Персональный экран -->
+    <section id="dashboard" class="dashboard hidden">
+      <div id="modules" class="modules"></div>
+      <div class="dash-actions">
+        <button id="shareBtn" type="button">Поделиться моей версией</button>
+        <button id="resetBtn" type="button" class="ghost">Сбросить профиль</button>
+      </div>
+      <p id="shareOut" class="share-out hidden"></p>
+    </section>
+  </main>
+
+  <footer class="footer">MONOMOD · всё хранится только в твоём браузере</footer>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
