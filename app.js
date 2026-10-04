@@ -1,687 +1,430 @@
-/* MONOMOD — один интерфейс, модифицированный под тебя.
-   Всё работает в браузере: профиль и прогресс хранятся в localStorage. */
+/* MONOMOD · канон v12.0 — статический сайт без сборки */
 (function () {
   'use strict';
 
-  // ---------- Данные ----------
-  var COLORS = [
-    { name: 'Фиолетовый', hex: '#7c5cff' },
-    { name: 'Синий', hex: '#2f6bff' },
-    { name: 'Бирюзовый', hex: '#12b5a5' },
-    { name: 'Зелёный', hex: '#3ccf4e' },
-    { name: 'Оранжевый', hex: '#ff7a1a' },
-    { name: 'Красный', hex: '#ff3b5c' }
+  // ---------- Данные канона ----------
+  const LAYERS = [
+    { id: 'all', name: 'Все' },
+    { id: 'core', name: 'CORE' },
+    { id: 'full', name: '𝕄_full' },
+    { id: 'plus', name: '𝕄+' },
+    { id: 'pp', name: '𝕄++' },
+    { id: 'mods', name: 'Моды' },
+    { id: 'ux', name: 'UX' },
+    { id: 'infra', name: 'Инфраструктура' },
+    { id: 'app', name: 'Приложения' }
   ];
 
-  var GOAL_EXAMPLES = ['Выучить английский', 'Пробежать марафон', 'Научиться программировать', 'Читать 20 книг в год', 'Накопить подушку'];
+  const SPECS = [
+    ['01', '01-core.md', 'M# — ядро MONOMOD', 'core'],
+    ['02', '02-k.md', 'K — базовая константа', 'core'],
+    ['03', '03-p1-p10.md', 'p1..p10 — 10 параметров', 'core'],
+    ['04', '04-110.347.md', '110.347 — баланс-константа', 'core'],
+    ['05', '05-lambda6.md', 'Λ6 — логическая граница', 'core'],
+    ['06', '06-gamma6.md', 'Γ6 — генеративная граница', 'core'],
+    ['07', '07-alpha6.md', 'Α6 — аналитическая граница', 'core'],
+    ['08', '08-git-ops.md', 'GIT-операции', 'full'],
+    ['09', '09-vozvrat.md', 'ВОЗВРАТ', 'full'],
+    ['10', '10-argmax-s.md', 'argmax S', 'plus'],
+    ['11', '11-compose.md', 'Композиция (D2)', 'plus'],
+    ['12', '12-hierarchy.md', 'Иерархия (D1)', 'plus'],
+    ['13', '13-formula.md', 'Формула (D3)', 'pp'],
+    ['14', '14-borders.md', '3 границы', 'pp'],
+    ['15', '15-roles.md', '3 роли', 'pp'],
+    ['16', '16-balance.md', 'Правило 2 людей', 'pp'],
+    ['17', '17-mod-m1.md', 'M1 Сборка', 'mods'],
+    ['18', '18-mod-m2.md', 'M2 Возврат', 'mods'],
+    ['19', '19-mod-m3.md', 'M3 Оптимизация', 'mods'],
+    ['20', '20-mod-m4.md', 'M4 Стабилизация', 'mods'],
+    ['21', '21-mod-m5.md', 'M5 Фиксация', 'mods'],
+    ['22', '22-scenarios-s1-s9.md', 'Сценарии S1–S9', 'ux'],
+    ['23', '23-scenarios-x1-x4.md', 'Сценарии X1–X4', 'ux'],
+    ['24', '24-68.md', 'Элемент 68', 'core'],
+    ['25', '25-194.md', 'Элемент 194', 'core'],
+    ['26', '26-m-hash.md', 'M# — хеш-идентификатор ядра', 'core'],
+    ['27', '27-log-access.md', 'Журнал входов/выходов', 'infra'],
+    ['28', '28-log-control.md', 'Журнал подписей держателей', 'infra'],
+    ['29', '29-log-release.md', 'Журнал релизов v1.0–v12.0', 'infra'],
+    ['30', '30-registry.md', 'Реестр 32 файлов', 'infra'],
+    ['31', '31-onepage.md', 'Канон ONE PAGE', 'infra'],
+    ['32', '32-versions.md', 'Карта 12 версий', 'infra'],
+    ['+', 'graph.md', 'Граф зависимостей (приложение)', 'app']
+  ].map(([num, file, title, layer]) => ({ num, file, title, layer }));
+  const BY_FILE = Object.fromEntries(SPECS.map(s => [s.file, s]));
+  const BY_NUM = Object.fromEntries(SPECS.map(s => [s.num, s]));
 
-  var CATEGORIES = [
-    {
-      id: 'language', label: 'Языки',
-      keys: ['англ', 'язык', 'немец', 'испан', 'франц', 'итальян', 'китай', 'япон', 'корей', 'english', 'слов', 'грамматик'],
-      unit: 'дней практики',
-      tips: [
-        'Выучи 10 новых слов и составь с каждым по предложению.',
-        'Посмотри 15 минут видео на языке без субтитров.',
-        'Запиши голосовое на 1 минуту о своём дне — на изучаемом языке.',
-        'Прочитай одну короткую статью и выпиши 5 незнакомых слов.',
-        'Повтори слова за прошлую неделю — интервальное повторение работает.',
-        'Разбери одно грамматическое правило и сделай 5 упражнений.',
-        'Переведи на язык 5 фраз, которые ты сегодня сказал(а) по-русски.'
-      ]
-    },
-    {
-      id: 'fitness', label: 'Тело',
-      keys: ['спорт', 'бег', 'пробеж', 'марафон', 'похуд', 'вес', 'зал', 'трен', 'фитнес', 'здоров', 'йог', 'плаван', 'отжим'],
-      unit: 'тренировок',
-      tips: [
-        '20 минут движения — любого. Главное начать.',
-        'Пройди сегодня на 2 000 шагов больше обычного.',
-        'Сделай 3 подхода планки — сколько сможешь.',
-        'Лёгкая пробежка или быстрая ходьба 25 минут.',
-        'Растяжка 10 минут перед сном.',
-        'Выпей 8 стаканов воды и отметь, как себя чувствуешь.',
-        'Ляг спать на 30 минут раньше — восстановление тоже тренировка.'
-      ]
-    },
-    {
-      id: 'code', label: 'Код',
-      keys: ['код', 'програм', 'разработ', 'python', 'javascript', 'js', 'сайт', 'frontend', 'backend', 'айти', 'it'],
-      unit: 'дней кода',
-      tips: [
-        'Реши одну задачу на алгоритмы — без подсказок первые 20 минут.',
-        'Напиши маленькую функцию и покрой её тестом.',
-        'Прочитай чужой код в open source и разберись в одном файле.',
-        'Сделай один коммит в свой учебный проект.',
-        'Изучи одну новую возможность языка и примени её.',
-        'Отрефактори кусок старого кода — сделай его понятнее.',
-        'Объясни вслух (или в заметке) тему, которую изучаешь.'
-      ]
-    },
-    {
-      id: 'reading', label: 'Чтение',
-      keys: ['книг', 'чита', 'чтени', 'литератур'],
-      unit: 'дней чтения',
-      tips: [
-        'Прочитай 20 страниц до того, как откроешь соцсети.',
-        'Выпиши одну мысль из книги, которая зацепила.',
-        'Читай 15 минут перед сном вместо телефона.',
-        'Расскажи кому-нибудь о книге, которую читаешь.',
-        'Выбери следующую книгу заранее — чтобы не было паузы.',
-        'Сделай короткий конспект прочитанной главы.',
-        'Носи книгу с собой — читай в очередях и дороге.'
-      ]
-    },
-    {
-      id: 'money', label: 'Финансы',
-      keys: ['деньг', 'накоп', 'финанс', 'бизнес', 'доход', 'заработ', 'бюджет', 'инвест', 'сбереж', 'подушк'],
-      unit: 'дней дисциплины',
-      tips: [
-        'Запиши все траты за сегодня — до рубля.',
-        'Отложи фиксированную сумму сразу, а не «что останется».',
-        'Отмени одну ненужную подписку.',
-        'Проведи день без спонтанных покупок.',
-        'Посчитай, сколько осталось до цели, и разбей на месяцы.',
-        'Изучи один финансовый инструмент 20 минут.',
-        'Подумай, какой навык может увеличить твой доход, и сделай первый шаг.'
-      ]
-    },
-    {
-      id: 'general', label: 'Цель',
-      keys: [],
-      unit: 'шагов',
-      tips: [
-        'Сделай одно маленькое действие к цели — прямо сейчас, за 5 минут.',
-        'Запиши, что мешало вчера, и убери одно препятствие.',
-        'Разбей цель на 3 ближайших шага и сделай первый.',
-        'Выдели 25 минут без телефона только для цели.',
-        'Расскажи кому-нибудь о своей цели — так проще не сдаться.',
-        'Отметь, что уже получилось. Прогресс важнее идеала.',
-        'Спланируй завтрашний шаг к цели сегодня вечером.'
-      ]
-    }
+  // Граф зависимостей — ровно как в разделе 2 канона
+  const G_ROWS = [
+    [{ id: 'n31', label: '31-onepage', sub: 'канон', files: ['31'] }],
+    [{ id: 'n13', label: '13-formula', files: ['13'] }, { id: 'n14', label: '14-borders', files: ['14'] }, { id: 'n15', label: '15-roles', files: ['15'] }],
+    [{ id: 'n01', label: '01-core', files: ['01'] }],
+    [{ id: 'n02', label: '02-k', files: ['02'] }, { id: 'n05', label: '05-Λ6', files: ['05'] }, { id: 'n24', label: '24-68', files: ['24'] }],
+    [{ id: 'n03', label: '03-p1..10', files: ['03'] }, { id: 'n06', label: '06-Γ6', files: ['06'] }, { id: 'n25', label: '25-194', files: ['25'] }],
+    [{ id: 'n04', label: '04-110.347', files: ['04'] }],
+    [{ id: 'n10', label: '10-argmax', files: ['10'] }, { id: 'n11', label: '11-compose', files: ['11'] }, { id: 'n12', label: '12-hier', files: ['12'] }],
+    [{ id: 'nM', label: '17..21 mod-m1..m5', sub: 'M1–M5', files: ['17', '18', '19', '20', '21'], wide: true }],
+    [{ id: 'nS', label: '22..23 scenarios', sub: 'S1–S9 · X1–X4', files: ['22', '23'], wide: true }],
+    [{ id: 'n32', label: '32-versions', files: ['32'], wide: true }]
   ];
-
-  var QUOTES = [
-    ['Путь в тысячу ли начинается с первого шага.', 'Лао-цзы'],
-    ['Мы есть то, что мы постоянно делаем.', 'Аристотель'],
-    ['Не бойся медленного движения, бойся остановки.', 'Китайская пословица'],
-    ['Лучшее время посадить дерево было 20 лет назад. Следующее лучшее — сейчас.', 'Пословица'],
-    ['Успех — это сумма небольших усилий, повторяемых изо дня в день.', 'Роберт Кольер'],
-    ['Дисциплина — мост между целями и достижениями.', 'Джим Рон'],
-    ['Делай что можешь, с тем что имеешь, там где ты есть.', 'Теодор Рузвельт'],
-    ['Тот, кто хочет, ищет возможности. Кто не хочет — ищет причины.', 'Сократ'],
-    ['Мотивация заставляет начать. Привычка — продолжать.', 'Джим Рюн'],
-    ['Сложнее всего начать действовать, всё остальное зависит только от упорства.', 'Амелия Эрхарт'],
-    ['Кто не делает ошибок, тот не делает ничего.', 'Пословица'],
-    ['Терпение и труд всё перетрут.', 'Русская пословица'],
-    ['Маленькие шаги каждый день дают большие результаты.', 'Неизвестный автор'],
-    ['Будущее зависит от того, что ты делаешь сегодня.', 'Махатма Ганди'],
-    ['Не ждите. Время никогда не будет подходящим.', 'Наполеон Хилл'],
-    ['Глаза боятся, а руки делают.', 'Русская пословица'],
-    ['Неважно, как медленно ты идёшь, пока ты не останавливаешься.', 'Конфуций'],
-    ['Действие — основополагающий ключ к любому успеху.', 'Пабло Пикассо']
+  const G_EDGES = [
+    ['n31', 'n13'], ['n31', 'n14'], ['n31', 'n15'],
+    ['n13', 'n01'], ['n14', 'n01'], ['n15', 'n01'],
+    ['n01', 'n02'], ['n01', 'n05'], ['n01', 'n24'],
+    ['n02', 'n03'], ['n05', 'n06'], ['n24', 'n25'],
+    ['n03', 'n04'], ['n06', 'n04'], ['n25', 'n04'],
+    ['n04', 'n10'], ['n04', 'n11'], ['n04', 'n12'],
+    ['n10', 'nM'], ['n11', 'nM'], ['n12', 'nM'],
+    ['nM', 'nS'], ['nS', 'n32']
   ];
+  const OFF_GRAPH = ['07', '08', '09', '16', '26', '27', '28', '29', '30'];
+  const G_NODES = Object.fromEntries(G_ROWS.flat().map(n => [n.id, n]));
 
-  var WMO = {
-    0: ['Ясно', '☀️'], 1: ['Преимущественно ясно', '🌤️'], 2: ['Переменная облачность', '⛅'], 3: ['Пасмурно', '☁️'],
-    45: ['Туман', '🌫️'], 48: ['Изморозь', '🌫️'],
-    51: ['Лёгкая морось', '🌦️'], 53: ['Морось', '🌦️'], 55: ['Сильная морось', '🌧️'],
-    56: ['Ледяная морось', '🌧️'], 57: ['Ледяная морось', '🌧️'],
-    61: ['Небольшой дождь', '🌦️'], 63: ['Дождь', '🌧️'], 65: ['Ливень', '🌧️'],
-    66: ['Ледяной дождь', '🌧️'], 67: ['Ледяной дождь', '🌧️'],
-    71: ['Небольшой снег', '🌨️'], 73: ['Снег', '🌨️'], 75: ['Сильный снег', '❄️'], 77: ['Снежная крупа', '🌨️'],
-    80: ['Ливневый дождь', '🌦️'], 81: ['Ливни', '🌧️'], 82: ['Сильные ливни', '⛈️'],
-    85: ['Снегопад', '🌨️'], 86: ['Сильный снегопад', '❄️'],
-    95: ['Гроза', '⛈️'], 96: ['Гроза с градом', '⛈️'], 99: ['Гроза с градом', '⛈️']
+  // ---------- Утилиты ----------
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
   };
 
-  // ---------- Чистые функции (тестируются в node) ----------
-  function hash(str) {
-    var h = 5381;
-    for (var i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;
-    return h;
-  }
-
-  function utf8ToBytes(s) {
-    if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(s);
-    return Buffer.from(s, 'utf8');
-  }
-  function bytesToUtf8(b) {
-    if (typeof TextDecoder !== 'undefined') return new TextDecoder().decode(b);
-    return Buffer.from(b).toString('utf8');
-  }
-
-  function b64urlEncode(str) {
-    var bytes = utf8ToBytes(str), bin = '';
-    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  }
-  function b64urlDecode(s) {
-    s = String(s).replace(/-/g, '+').replace(/_/g, '/');
-    while (s.length % 4) s += '=';
-    var bin = atob(s), bytes = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return bytesToUtf8(bytes);
-  }
-
-  function sanitizeProfile(p) {
-    if (!p || typeof p !== 'object') return null;
-    var name = typeof p.n === 'string' ? p.n.trim().slice(0, 40) : '';
-    var goal = typeof p.g === 'string' ? p.g.trim().slice(0, 80) : '';
-    var color = typeof p.c === 'string' && /^#[0-9a-f]{6}$/i.test(p.c) ? p.c.toLowerCase() : COLORS[0].hex;
-    if (!name || !goal) return null;
-    return { v: 1, n: name, g: goal, c: color };
-  }
-
-  function encodeProfile(p) {
-    var s = sanitizeProfile(p);
-    return s ? b64urlEncode(JSON.stringify(s)) : '';
-  }
-  function decodeProfile(code) {
-    try { return sanitizeProfile(JSON.parse(b64urlDecode(code))); } catch (e) { return null; }
-  }
-
-  function profileId(p) { return hash(p.n.toLowerCase() + '|' + p.g.toLowerCase()).toString(36); }
-
-  function categoryFor(goal) {
-    var g = String(goal).toLowerCase();
-    for (var i = 0; i < CATEGORIES.length; i++) {
-      var c = CATEGORIES[i];
-      for (var k = 0; k < c.keys.length; k++) {
-        var key = c.keys[k];
-        // короткие латинские ключи (js, it) — только как отдельное слово
-        if (/^[a-z]{1,3}$/.test(key)) {
-          if (new RegExp('(^|[^a-zа-яё])' + key + '([^a-zа-яё]|$)').test(g)) return c;
-        } else if (g.indexOf(key) !== -1) return c;
-      }
-    }
-    return CATEGORIES[CATEGORIES.length - 1];
-  }
-
-  function dayOfYear(d) {
-    var start = new Date(d.getFullYear(), 0, 0);
-    return Math.floor((d - start + (start.getTimezoneOffset() - d.getTimezoneOffset()) * 60000) / 86400000);
-  }
-  function isoDay(d) {
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  }
-
-  function partOfDay(h) {
-    if (h >= 5 && h < 12) return 'morning';
-    if (h >= 12 && h < 18) return 'day';
-    if (h >= 18 && h < 23) return 'evening';
-    return 'night';
-  }
-  var GREETINGS = { morning: 'Доброе утро', day: 'Добрый день', evening: 'Добрый вечер', night: 'Доброй ночи' };
-
-  /* Правила: порядок модулей зависит от времени суток и состояния прогресса. */
-  function moduleOrder(h, opts) {
-    opts = opts || {};
-    var order;
-    switch (partOfDay(h)) {
-      case 'morning': order = ['focus', 'progress', 'clock', 'weather', 'quote']; break;
-      case 'day': order = ['progress', 'focus', 'weather', 'clock', 'quote']; break;
-      case 'evening': order = ['progress', 'quote', 'focus', 'clock', 'weather']; break;
-      default: order = ['quote', 'progress', 'clock', 'focus', 'weather'];
-    }
-    // Если шаг на сегодня уже сделан — фокус уходит ниже, на первый план прогресс.
-    if (opts.doneToday) {
-      order = order.filter(function (m) { return m !== 'focus'; });
-      order.splice(Math.min(3, order.length), 0, 'focus');
-      order = order.filter(function (m) { return m !== 'progress'; });
-      order.unshift('progress');
-    }
-    if (opts.weatherOff) order = order.filter(function (m) { return m !== 'weather'; });
-    return ['greeting'].concat(order);
-  }
-
-  function themeFor(pref, h) {
-    if (pref === 'light' || pref === 'dark') return pref;
-    return h >= 7 && h < 19 ? 'light' : 'dark';
-  }
-
-  function inkFor(hex) {
-    var r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
-    function lin(c) { return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
-    var L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-    return L > 0.45 ? '#111111' : '#ffffff';
-  }
-
-  function streak(days, today) {
-    var set = {}; (days || []).forEach(function (d) { set[d] = true; });
-    var n = 0, d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    if (!set[isoDay(d)]) d.setDate(d.getDate() - 1); // серия не прерывается, пока сегодня не закончилось
-    while (set[isoDay(d)]) { n++; d.setDate(d.getDate() - 1); }
-    return n;
-  }
-
-  function plural(n, one, few, many) {
-    var m10 = n % 10, m100 = n % 100;
-    if (m10 === 1 && m100 !== 11) return one;
-    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
-    return many;
-  }
-
-  var MM = {
-    COLORS: COLORS, CATEGORIES: CATEGORIES, QUOTES: QUOTES,
-    hash: hash, b64urlEncode: b64urlEncode, b64urlDecode: b64urlDecode,
-    sanitizeProfile: sanitizeProfile, encodeProfile: encodeProfile, decodeProfile: decodeProfile,
-    profileId: profileId, categoryFor: categoryFor, dayOfYear: dayOfYear, isoDay: isoDay,
-    partOfDay: partOfDay, moduleOrder: moduleOrder, themeFor: themeFor, inkFor: inkFor,
-    streak: streak, plural: plural
-  };
-  if (typeof module !== 'undefined' && module.exports) module.exports = MM;
-  if (typeof document === 'undefined') return;
-
-  // ---------- Браузер ----------
-  var LS = {
-    get: function (k, def) { try { var v = localStorage.getItem('monomod:' + k); return v === null ? def : JSON.parse(v); } catch (e) { return def; } },
-    set: function (k, v) { try { localStorage.setItem('monomod:' + k, JSON.stringify(v)); } catch (e) {} },
-    del: function (k) { try { localStorage.removeItem('monomod:' + k); } catch (e) {} }
-  };
-
-  var $ = function (id) { return document.getElementById(id); };
-  function el(tag, cls, text) {
-    var e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (text !== undefined) e.textContent = text;
-    return e;
-  }
-
-  var state = {
-    profile: null,     // текущий отображаемый профиль
-    shared: false,     // открыт по чужой ссылке
-    step: 0,
-    draft: { n: '', g: '', c: COLORS[0].hex },
-    weather: null,
-    weatherStatus: 'idle'
-  };
-
-  var toastTimer;
-  function toast(msg) {
-    var t = $('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
-  }
-
-  // ----- Тема и акцент -----
-  function applyTheme() {
-    var pref = LS.get('theme', 'auto');
-    var theme = themeFor(pref, new Date().getHours());
-    document.documentElement.setAttribute('data-theme', theme);
-    $('themeLabel').textContent = pref === 'auto' ? 'Авто' : (pref === 'light' ? 'Светлая' : 'Тёмная');
-    var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', theme === 'light' ? '#f6f5f2' : '#0e0e0e');
-  }
-  function applyAccent(hex) {
-    document.documentElement.style.setProperty('--accent', hex);
-    document.documentElement.style.setProperty('--accent-ink', inkFor(hex));
-  }
-  $('themeToggle').addEventListener('click', function () {
-    var next = { auto: 'light', light: 'dark', dark: 'auto' }[LS.get('theme', 'auto')] || 'auto';
-    LS.set('theme', next);
-    applyTheme();
-    toast('Тема: ' + $('themeLabel').textContent.toLowerCase());
-  });
-
-  // ----- Прогресс -----
-  function progressKey(p) { return 'progress:' + profileId(p); }
-  function getProgress(p) {
-    var pr = LS.get(progressKey(p), null);
-    if (!pr || typeof pr !== 'object') pr = { count: 0, target: 30, days: [] };
-    if (!Array.isArray(pr.days)) pr.days = [];
-    pr.count = Math.max(0, parseInt(pr.count, 10) || 0);
-    pr.target = Math.max(1, parseInt(pr.target, 10) || 30);
-    return pr;
-  }
-  function saveProgress(p, pr) { LS.set(progressKey(p), pr); }
-  function toggleToday(p) {
-    var pr = getProgress(p), today = isoDay(new Date()), i = pr.days.indexOf(today);
-    if (i === -1) { pr.days.push(today); pr.count++; toast('Шаг засчитан. Так держать!'); }
-    else { pr.days.splice(i, 1); pr.count = Math.max(0, pr.count - 1); }
-    pr.days = pr.days.slice(-400);
-    saveProgress(p, pr);
-    renderDashboard();
-  }
-
-  // ----- Онбординг -----
-  function buildOnboardingStatic() {
-    var sw = $('swatches');
-    COLORS.forEach(function (c) {
-      var b = el('button', 'swatch');
-      b.type = 'button';
-      b.style.background = c.hex;
-      b.setAttribute('role', 'radio');
-      b.setAttribute('aria-label', c.name);
-      b.title = c.name;
-      b.dataset.hex = c.hex;
-      b.addEventListener('click', function () { setDraftColor(c.hex); });
-      sw.appendChild(b);
+  // ---------- Мини-рендер Markdown ----------
+  function inline(s) {
+    const codes = [];
+    s = s.replace(/`([^`]+)`/g, (_, c) => { codes.push(c); return '\u0000' + (codes.length - 1) + '\u0000'; });
+    s = esc(s);
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, t, u) => {
+      if (/^[\w.\-]+\.md$/.test(u)) return '<a data-spec="' + u + '">' + t + '</a>';
+      if (/^https?:\/\//.test(u)) return '<a href="' + u + '" target="_blank" rel="noopener">' + t + '</a>';
+      return t;
     });
-    $('obColor').addEventListener('input', function (e) { setDraftColor(e.target.value); });
-    var chips = $('goalChips');
-    GOAL_EXAMPLES.forEach(function (g) {
-      var b = el('button', '', g);
-      b.type = 'button';
-      b.addEventListener('click', function () { $('obGoal').value = g; $('obGoal').focus(); });
-      chips.appendChild(b);
-    });
-    $('obForm').addEventListener('submit', function (e) { e.preventDefault(); nextStep(); });
-    $('obBack').addEventListener('click', function () { if (state.step > 0) showStep(state.step - 1); });
+    return s.replace(/\u0000(\d+)\u0000/g, (_, i) => '<code>' + esc(codes[+i]) + '</code>');
   }
+  const cells = line => line.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
 
-  function setDraftColor(hex) {
-    state.draft.c = hex.toLowerCase();
-    applyAccent(state.draft.c);
-    $('obColor').value = state.draft.c;
-    Array.prototype.forEach.call(document.querySelectorAll('.swatch'), function (b) {
-      b.setAttribute('aria-checked', b.dataset.hex === state.draft.c ? 'true' : 'false');
-    });
-  }
-
-  function showStep(n) {
-    state.step = n;
-    Array.prototype.forEach.call(document.querySelectorAll('.step'), function (s) {
-      s.classList.toggle('hidden', Number(s.dataset.step) !== n);
-    });
-    $('obBack').classList.toggle('hidden', n === 0);
-    $('obNext').textContent = n === 2 ? 'Собрать мой MONOMOD' : 'Дальше →';
-    $('obError').textContent = '';
-    var input = n === 0 ? $('obName') : n === 1 ? $('obGoal') : null;
-    if (input) setTimeout(function () { input.focus(); }, 30);
-  }
-
-  function nextStep() {
-    if (state.step === 0) {
-      var n = $('obName').value.trim();
-      if (!n) { $('obError').textContent = 'Напиши, как к тебе обращаться.'; return; }
-      state.draft.n = n; showStep(1);
-    } else if (state.step === 1) {
-      var g = $('obGoal').value.trim();
-      if (!g) { $('obError').textContent = 'Цель поможет подобрать фокус дня.'; return; }
-      state.draft.g = g; showStep(2);
-    } else {
-      var p = sanitizeProfile(state.draft);
-      if (!p) { showStep(0); return; }
-      LS.set('profile', p);
-      state.profile = p;
-      state.shared = false;
-      cleanUrl();
-      showDashboard();
-      toast('Готово! Это твой MONOMOD.');
-    }
-  }
-
-  function startOnboarding(prefill) {
-    state.draft = prefill ? { n: prefill.n, g: prefill.g, c: prefill.c } : { n: '', g: '', c: COLORS[0].hex };
-    $('obName').value = state.draft.n;
-    $('obGoal').value = state.draft.g;
-    setDraftColor(state.draft.c);
-    $('dashboard').classList.add('hidden');
-    $('sharedBanner').classList.add('hidden');
-    $('editBtn').classList.add('hidden');
-    $('onboarding').classList.remove('hidden');
-    showStep(0);
-  }
-
-  // ----- Модули -----
-  var renderers = {
-    greeting: function (p, now) {
-      var m = el('section', 'mod wide greeting');
-      var h = el('h1', 'hello');
-      h.appendChild(document.createTextNode(GREETINGS[partOfDay(now.getHours())] + ', '));
-      h.appendChild(el('em', '', p.n));
-      m.appendChild(h);
-      m.appendChild(el('p', 'sub', 'Твоя цель: «' + p.g + '». Сегодня — ещё один шаг к ней.'));
-      return m;
-    },
-    focus: function (p, now) {
-      var cat = categoryFor(p.g);
-      var tip = cat.tips[(dayOfYear(now) + hash(p.n)) % cat.tips.length];
-      var m = el('section', 'mod focus');
-      m.appendChild(el('h2', '', 'Фокус дня'));
-      m.appendChild(el('span', 'tag', cat.label));
-      m.appendChild(el('p', 'big', tip));
-      var pr = getProgress(p), done = pr.days.indexOf(isoDay(now)) !== -1;
-      var lab = el('label', 'check');
-      var cb = el('input'); cb.type = 'checkbox'; cb.checked = done;
-      cb.addEventListener('change', function () { toggleToday(p); });
-      lab.appendChild(cb);
-      lab.appendChild(document.createTextNode(done ? 'Сделано сегодня ✓' : 'Отметить: сделано сегодня'));
-      m.appendChild(lab);
-      return m;
-    },
-    progress: function (p, now) {
-      var cat = categoryFor(p.g), pr = getProgress(p);
-      var pct = Math.min(100, Math.round(pr.count / pr.target * 100));
-      var m = el('section', 'mod progress');
-      m.appendChild(el('h2', '', 'Прогресс к цели'));
-      m.appendChild(el('p', 'big', pr.count + ' из ' + pr.target + ' ' + cat.unit));
-      var bar = el('div', 'progress-bar'), fill = el('div');
-      fill.style.width = pct + '%';
-      bar.setAttribute('role', 'progressbar');
-      bar.setAttribute('aria-valuenow', String(pct));
-      bar.setAttribute('aria-valuemin', '0');
-      bar.setAttribute('aria-valuemax', '100');
-      bar.appendChild(fill); m.appendChild(bar);
-      var s = streak(pr.days, now);
-      m.appendChild(el('p', 'sub', pct + '% · серия: ' + s + ' ' + plural(s, 'день', 'дня', 'дней') + (pct >= 100 ? ' · цель достигнута 🎉' : '')));
-      var row = el('div', 'row'); row.style.marginTop = '14px';
-      var plus = el('button', 'small', '+1'); plus.type = 'button';
-      plus.addEventListener('click', function () { var x = getProgress(p); x.count++; saveProgress(p, x); renderDashboard(); });
-      var minus = el('button', 'small ghost', '−1'); minus.type = 'button';
-      minus.addEventListener('click', function () { var x = getProgress(p); x.count = Math.max(0, x.count - 1); saveProgress(p, x); renderDashboard(); });
-      var tgt = el('button', 'small ghost', 'Цель: ' + pr.target); tgt.type = 'button';
-      tgt.addEventListener('click', function () {
-        var v = prompt('Сколько ' + cat.unit + ' нужно до цели?', String(pr.target));
-        var n = parseInt(v, 10);
-        if (n > 0 && n < 100000) { var x = getProgress(p); x.target = n; saveProgress(p, x); renderDashboard(); }
-      });
-      row.appendChild(plus); row.appendChild(minus); row.appendChild(tgt);
-      m.appendChild(row);
-      return m;
-    },
-    clock: function (p, now) {
-      var m = el('section', 'mod clock');
-      m.appendChild(el('h2', '', 'Сейчас'));
-      var t = el('p', 'time'); t.id = 'clockTime';
-      var d = el('p', 'sub'); d.id = 'clockDate';
-      m.appendChild(t); m.appendChild(d);
-      updateClock(t, d);
-      return m;
-    },
-    quote: function (p, now) {
-      var q = QUOTES[(dayOfYear(now) + hash(p.g)) % QUOTES.length];
-      var m = el('section', 'mod quote');
-      m.appendChild(el('h2', '', 'Мысль дня'));
-      m.appendChild(el('blockquote', '', q[0]));
-      m.appendChild(el('p', 'sub', '— ' + q[1]));
-      return m;
-    },
-    weather: function () {
-      var m = el('section', 'mod weather');
-      m.appendChild(el('h2', '', 'Погода рядом'));
-      if (state.weatherStatus === 'ok' && state.weather) {
-        var w = state.weather, info = WMO[w.code] || ['—', '🌡️'];
-        m.appendChild(el('p', 'big', info[1] + ' ' + Math.round(w.temp) + '°'));
-        m.appendChild(el('p', 'sub', info[0] + ' · ветер ' + Math.round(w.wind) + ' км/ч'));
-      } else if (state.weatherStatus === 'loading') {
-        m.appendChild(el('p', 'sub', 'Определяю погоду…'));
-      } else if (state.weatherStatus === 'error') {
-        m.appendChild(el('p', 'sub', 'Не удалось загрузить погоду. Попробуй позже.'));
-        m.appendChild(weatherButtons(true));
+  function md(src) {
+    const L = src.replace(/\r/g, '').split('\n');
+    const out = [];
+    let i = 0;
+    const isSpecial = l => /^(```|#{1,6}\s|>|\s*[-*]\s+|\s*\d+\.\s+|\|)/.test(l);
+    while (i < L.length) {
+      const l = L[i];
+      if (/^```/.test(l)) {
+        const buf = []; i++;
+        while (i < L.length && !/^```/.test(L[i])) buf.push(L[i++]);
+        i++;
+        out.push('<pre><code>' + esc(buf.join('\n')) + '</code></pre>');
+      } else if (/^#{1,6}\s/.test(l)) {
+        const m = l.match(/^(#{1,6})\s+(.*)$/);
+        out.push('<h' + m[1].length + '>' + inline(m[2]) + '</h' + m[1].length + '>');
+        i++;
+      } else if (/^\|/.test(l) && L[i + 1] && /^\|[\s\-:|]+\|\s*$/.test(L[i + 1])) {
+        const head = cells(l); i += 2;
+        const rows = [];
+        while (i < L.length && /^\|/.test(L[i])) rows.push(cells(L[i++]));
+        out.push('<div class="table-wrap"><table><thead><tr>' + head.map(h => '<th>' + inline(h) + '</th>').join('') +
+          '</tr></thead><tbody>' + rows.map(r => '<tr>' + r.map(c => '<td>' + inline(c) + '</td>').join('') + '</tr>').join('') +
+          '</tbody></table></div>');
+      } else if (/^>/.test(l)) {
+        const buf = [];
+        while (i < L.length && /^>/.test(L[i])) buf.push(L[i++].replace(/^>\s?/, ''));
+        out.push('<blockquote>' + md(buf.join('\n')) + '</blockquote>');
+      } else if (/^\s*([-*]|\d+\.)\s+/.test(l)) {
+        const ordered = /^\s*\d+\./.test(l);
+        const buf = [];
+        while (i < L.length && /^\s*([-*]|\d+\.)\s+/.test(L[i])) buf.push(L[i++].replace(/^\s*([-*]|\d+\.)\s+/, ''));
+        const tag = ordered ? 'ol' : 'ul';
+        out.push('<' + tag + '>' + buf.map(b => '<li>' + inline(b) + '</li>').join('') + '</' + tag + '>');
+      } else if (!l.trim()) {
+        i++;
       } else {
-        m.appendChild(el('p', 'sub', 'Покажу погоду там, где ты сейчас. Нужен доступ к геолокации — координаты уходят только в Open-Meteo.'));
-        m.appendChild(weatherButtons(false));
+        const buf = [];
+        while (i < L.length && L[i].trim() && !isSpecial(L[i])) buf.push(L[i++]);
+        out.push('<p>' + inline(buf.join(' ')) + '</p>');
       }
-      return m;
     }
-  };
-
-  function weatherButtons(retry) {
-    var row = el('div', 'row'); row.style.marginTop = '14px';
-    var yes = el('button', 'small', retry ? 'Повторить' : 'Показать погоду'); yes.type = 'button';
-    yes.addEventListener('click', function () { LS.set('weather', 'on'); loadWeather(); });
-    var no = el('button', 'small ghost', 'Скрыть'); no.type = 'button';
-    no.addEventListener('click', function () { LS.set('weather', 'off'); renderDashboard(); });
-    row.appendChild(yes); row.appendChild(no);
-    return row;
+    return out.join('\n');
   }
 
-  function loadWeather() {
-    if (!('geolocation' in navigator)) { LS.set('weather', 'off'); renderDashboard(); return; }
-    state.weatherStatus = 'loading'; renderDashboard();
-    navigator.geolocation.getCurrentPosition(function (pos) {
-      var lat = pos.coords.latitude.toFixed(2), lon = pos.coords.longitude.toFixed(2);
-      fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
-        '&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto')
-        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-        .then(function (j) {
-          state.weather = { temp: j.current.temperature_2m, code: j.current.weather_code, wind: j.current.wind_speed_10m };
-          state.weatherStatus = 'ok'; renderDashboard();
-        })
-        .catch(function () { state.weatherStatus = 'error'; renderDashboard(); });
-    }, function () {
-      // Пользователь не разрешил геолокацию — тихо убираем модуль.
-      LS.set('weather', 'off');
-      state.weatherStatus = 'idle';
-      toast('Без геолокации — погоду скрыл');
-      renderDashboard();
-    }, { timeout: 10000, maximumAge: 1800000 });
+  // ---------- Загрузка спек ----------
+  const cache = new Map();
+  function loadSpec(file) {
+    if (!cache.has(file)) {
+      cache.set(file, fetch('specs/' + encodeURIComponent(file), { cache: 'no-cache' }).then(r => {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      }).catch(e => { cache.delete(file); throw e; }));
+    }
+    return cache.get(file);
   }
-
-  function updateClock(t, d) {
-    t = t || $('clockTime'); d = d || $('clockDate');
-    if (!t || !d) return;
-    var now = new Date();
-    t.textContent = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    var ds = now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
-    d.textContent = ds.charAt(0).toUpperCase() + ds.slice(1);
-  }
-
-  function renderDashboard() {
-    var p = state.profile; if (!p) return;
-    var now = new Date();
-    var pr = getProgress(p);
-    var order = moduleOrder(now.getHours(), {
-      doneToday: pr.days.indexOf(isoDay(now)) !== -1,
-      weatherOff: LS.get('weather', 'ask') === 'off'
-    });
-    var box = $('modules');
-    box.textContent = '';
-    var rest = order.slice(1);
-    order.forEach(function (name, i) {
-      var node = renderers[name](p, now);
-      if (i > 0) {
-        var idx = i - 1;
-        // первые два модуля — крупные, остальные делят ряд
-        var tail = rest.length - 2;
-        if (idx >= 2) node.classList.add(tail === 3 ? 'third' : tail === 1 ? 'wide' : 'half');
-      }
-      box.appendChild(node);
+  function renderSpecInto(el, file) {
+    el.innerHTML = '<p class="muted">Загрузка ' + esc(file) + '…</p>';
+    return loadSpec(file).then(txt => {
+      el.innerHTML = '<div class="md">' + md(txt) +
+        '<p class="md-meta">Источник: <a href="specs/' + esc(file) + '" target="_blank" rel="noopener">specs/' + esc(file) + '</a></p></div>';
+    }).catch(err => {
+      el.innerHTML = '<p class="err">Не удалось загрузить specs/' + esc(file) + ' (' + esc(err.message) + ').</p>';
     });
   }
 
-  function showDashboard() {
-    var p = state.profile;
-    applyAccent(p.c);
-    document.title = 'MONOMOD · ' + p.n;
-    $('onboarding').classList.add('hidden');
-    $('dashboard').classList.remove('hidden');
-    $('editBtn').classList.remove('hidden');
-    $('shareOut').classList.add('hidden');
-    if (state.shared) {
-      $('sharedText').textContent = 'Ты смотришь версию MONOMOD для «' + p.n + '».';
-      $('sharedBanner').classList.remove('hidden');
-    } else {
-      $('sharedBanner').classList.add('hidden');
-    }
-    var box = $('modules');
-    box.classList.remove('animate'); void box.offsetWidth; box.classList.add('animate');
-    setTimeout(function () { box.classList.remove('animate'); }, 700);
-    if (LS.get('weather', 'ask') === 'on' && state.weatherStatus === 'idle') loadWeather();
-    renderDashboard();
+  // ---------- Тема ----------
+  const THEMES = ['auto', 'dark', 'light'];
+  const THEME_LABEL = { auto: 'Авто', dark: 'Тёмная', light: 'Светлая' };
+  const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
+  let themeMode = store.get('monomod.theme') || 'auto';
+  function applyTheme() {
+    const t = themeMode === 'auto' ? (mq && mq.matches ? 'light' : 'dark') : themeMode;
+    document.documentElement.setAttribute('data-theme', t);
+    $('#themeLabel').textContent = THEME_LABEL[themeMode];
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', t === 'light' ? '#f6f5f2' : '#0e0e0e');
   }
-
-  function shareUrl(p) {
-    return location.origin + location.pathname + '?u=' + encodeProfile(p);
-  }
-  function cleanUrl() {
-    if (location.search) history.replaceState(null, '', location.pathname + location.hash);
-  }
-
-  $('shareBtn').addEventListener('click', function () {
-    var url = shareUrl(state.profile);
-    var out = $('shareOut');
-    out.textContent = '';
-    out.appendChild(document.createTextNode('Твоя личная ссылка: '));
-    var a = el('a', '', url); a.href = url; out.appendChild(a);
-    out.classList.remove('hidden');
-    if (navigator.share && /Mobi|Android/i.test(navigator.userAgent)) {
-      navigator.share({ title: 'Мой MONOMOD', url: url }).catch(function () {});
-    } else if (navigator.clipboard) {
-      navigator.clipboard.writeText(url).then(function () { toast('Ссылка скопирована'); }, function () { toast('Скопируй ссылку ниже'); });
-    } else toast('Скопируй ссылку ниже');
-  });
-
-  $('resetBtn').addEventListener('click', function () {
-    if (!confirm('Сбросить профиль и прогресс на этом устройстве?')) return;
-    if (state.profile && !state.shared) LS.del(progressKey(state.profile));
-    if (!state.shared) LS.del('profile');
-    LS.del('weather');
-    state.profile = null; state.shared = false; state.weatherStatus = 'idle'; state.weather = null;
-    cleanUrl();
-    startOnboarding(null);
-  });
-
-  $('editBtn').addEventListener('click', function () { startOnboarding(state.profile); });
-  $('adoptBtn').addEventListener('click', function () {
-    LS.set('profile', state.profile);
-    state.shared = false; cleanUrl(); showDashboard();
-    toast('Теперь это твоя версия');
-  });
-  $('ownBtn').addEventListener('click', function () {
-    state.shared = false; cleanUrl();
-    var own = sanitizeProfile(LS.get('profile', null));
-    if (own) { state.profile = own; showDashboard(); } else startOnboarding(null);
-  });
-
-  // ----- Старт -----
-  function init() {
+  $('#themeToggle').addEventListener('click', () => {
+    themeMode = THEMES[(THEMES.indexOf(themeMode) + 1) % THEMES.length];
+    store.set('monomod.theme', themeMode);
     applyTheme();
-    buildOnboardingStatic();
-    var params = new URLSearchParams(location.search);
-    var own = sanitizeProfile(LS.get('profile', null));
-    if (params.has('u')) {
-      var sp = decodeProfile(params.get('u'));
-      if (sp) {
-        state.profile = sp;
-        state.shared = !own || profileId(own) !== profileId(sp) || own.c !== sp.c;
-        if (!state.shared) cleanUrl();
-        showDashboard();
-        startTicker();
-        return;
-      }
-      toast('Ссылка повреждена — открываю обычную версию');
-      cleanUrl();
+  });
+  if (mq && mq.addEventListener) mq.addEventListener('change', applyTheme);
+  applyTheme();
+
+  // ---------- Браузер файлов ----------
+  let curLayer = 'all';
+  let curFile = null;
+  function renderTabs() {
+    $('#layerTabs').innerHTML = LAYERS.map(l => {
+      const n = l.id === 'all' ? 32 : SPECS.filter(s => s.layer === l.id).length;
+      return '<button type="button" role="tab" data-layer="' + l.id + '" aria-selected="' + (l.id === curLayer) + '">' +
+        esc(l.name) + '<span class="n">' + n + '</span></button>';
+    }).join('');
+  }
+  function renderList() {
+    const list = curLayer === 'all' ? SPECS.filter(s => s.layer !== 'app') : SPECS.filter(s => s.layer === curLayer);
+    let html = '';
+    if (curLayer === 'all') {
+      LAYERS.filter(l => l.id !== 'all' && l.id !== 'app').forEach(l => {
+        html += '<li class="layer-h">' + esc(l.name) + '</li>';
+        list.filter(s => s.layer === l.id).forEach(s => { html += item(s); });
+      });
+    } else list.forEach(s => { html += item(s); });
+    $('#fileList').innerHTML = html;
+    function item(s) {
+      return '<li><button type="button" data-file="' + s.file + '"' + (s.file === curFile ? ' class="active"' : '') + '>' +
+        '<span class="num">' + s.num + '</span><span><span class="ttl">' + esc(s.title) + '</span><span class="fname">' + esc(s.file) + '</span></span></button></li>';
     }
-    if (own) { state.profile = own; showDashboard(); }
-    else startOnboarding(null);
-    startTicker();
+  }
+  function openFile(file, opts = {}) {
+    const s = BY_FILE[file];
+    if (!s) return;
+    curFile = file;
+    if (curLayer !== 'all' && curLayer !== s.layer) curLayer = s.layer;
+    if (s.layer === 'app') curLayer = 'app';
+    renderTabs(); renderList();
+    renderSpecInto($('#viewer'), file);
+    if (!opts.noHash && history.replaceState) history.replaceState(null, '', '#spec=' + encodeURIComponent(file));
+    if (opts.scroll) $('#files').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  $('#layerTabs').addEventListener('click', e => {
+    const b = e.target.closest('button[data-layer]');
+    if (!b) return;
+    curLayer = b.dataset.layer;
+    renderTabs(); renderList();
+    const list = SPECS.filter(s => curLayer === 'all' ? s.layer !== 'app' : s.layer === curLayer);
+    if (!curFile || !list.some(s => s.file === curFile)) openFile(list[0].file);
+  });
+  $('#fileList').addEventListener('click', e => {
+    const b = e.target.closest('button[data-file]');
+    if (b) openFile(b.dataset.file);
+  });
+
+  // ---------- Граф ----------
+  const children = {};
+  G_EDGES.forEach(([a, b]) => { (children[a] = children[a] || []).push(b); });
+  function descendants(id) {
+    const seen = new Set(); const st = [id];
+    while (st.length) { const x = st.pop(); (children[x] || []).forEach(c => { if (!seen.has(c)) { seen.add(c); st.push(c); } }); }
+    return seen;
+  }
+  function renderGraph() {
+    $('#graphRows').innerHTML = G_ROWS.map(row => '<div class="g-row">' + row.map(n =>
+      '<button type="button" class="g-node' + (n.wide ? ' wide' : '') + '" data-node="' + n.id + '" title="' +
+      esc(n.files.map(f => BY_NUM[f].file).join(', ')) + '">' + esc(n.label) +
+      (n.sub ? '<small>' + esc(n.sub) + '</small>' : '') + '</button>').join('') + '</div>').join('');
+    $('#offGraph').innerHTML = OFF_GRAPH.map(n => '<button type="button" class="chip ghost" data-off="' + n + '">' + esc(BY_NUM[n].file) + '</button>').join('');
+    drawEdges();
+  }
+  function drawEdges(hot) {
+    const box = $('#graphBox'); const svg = $('#edges');
+    const br = box.getBoundingClientRect();
+    svg.setAttribute('viewBox', '0 0 ' + br.width + ' ' + br.height);
+    let p = '<defs>' +
+      '<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--line);stroke:none"/></marker>' +
+      '<marker id="arh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--accent);stroke:none"/></marker></defs>';
+    G_EDGES.forEach(([a, b]) => {
+      const ea = box.querySelector('[data-node="' + a + '"]'); const eb = box.querySelector('[data-node="' + b + '"]');
+      if (!ea || !eb) return;
+      const ra = ea.getBoundingClientRect(); const rb = eb.getBoundingClientRect();
+      const x1 = ra.left + ra.width / 2 - br.left, y1 = ra.bottom - br.top;
+      const x2 = rb.left + rb.width / 2 - br.left, y2 = rb.top - br.top - 1;
+      const my = (y1 + y2) / 2;
+      const isHot = hot && hot.has(a) && hot.has(b);
+      p += '<path class="' + (isHot ? 'hot' : '') + '" marker-end="url(#' + (isHot ? 'arh' : 'ar') + ')" d="M' + x1 + ' ' + y1 + ' C' + x1 + ' ' + my + ',' + x2 + ' ' + my + ',' + x2 + ' ' + y2 + '"/>';
+    });
+    svg.innerHTML = p;
+  }
+  let hotSet = null;
+  function ruleFor(nums) {
+    if (nums.includes('01')) return 'core';
+    if (nums.includes('02') || nums.includes('03')) return 'kp';
+    if (nums.some(n => ['05', '06', '07'].includes(n))) return 'borders';
+    if (nums.includes('13')) return 'formula';
+    return null;
+  }
+  const IMPACT = {
+    core: 'Изменение 01-core → пересчёт всех 32 файлов.',
+    kp: 'Изменение K / p1..p10 → триггер 04-110.347 → возможен X4. Нужны подписи обоих держателей.',
+    borders: 'Изменение границы → пересборка мод M4 (Стабилизация).',
+    formula: 'Изменение формулы → только через D3 с двумя подписями.'
+  };
+  function selectGraph(nodeId, offNum) {
+    const nums = nodeId ? G_NODES[nodeId].files : [offNum];
+    document.querySelectorAll('.g-node').forEach(el => el.classList.remove('sel', 'hot'));
+    document.querySelectorAll('#offGraph .chip').forEach(el => el.classList.remove('sel-chip'));
+    let downstream = new Set();
+    const rule = ruleFor(nums);
+    if (nodeId) {
+      downstream = descendants(nodeId);
+      if (rule === 'core') Object.keys(G_NODES).forEach(k => downstream.add(k));
+      downstream.delete(nodeId);
+      hotSet = new Set([nodeId, ...downstream]);
+      if (rule === 'core') hotSet = new Set(Object.keys(G_NODES));
+      document.querySelector('[data-node="' + nodeId + '"]').classList.add('sel');
+      downstream.forEach(d => { const el = document.querySelector('[data-node="' + d + '"]'); if (el) el.classList.add('hot'); });
+    } else {
+      hotSet = null;
+      if (rule === 'borders') { const m = document.querySelector('[data-node="nM"]'); if (m) m.classList.add('hot'); }
+    }
+    drawEdges(hotSet);
+    document.querySelectorAll('#rulesList li').forEach(li => li.classList.toggle('on', li.dataset.rule === rule));
+
+    const panel = $('#graphSpec');
+    let head = '';
+    if (rule) head += '<p class="impact">' + esc(IMPACT[rule]) + '</p>';
+    else if (nodeId && downstream.size) head += '<p class="impact">Ниже по графу зависят узлов: ' + downstream.size + '.</p>';
+    if (!nodeId) head += '<p class="muted" style="font-size:.85rem">Этот файл на схеме канона не изображён.</p>';
+    if (nums.length > 1) {
+      head += '<div class="multi-tabs">' + nums.map((n, i) => '<button type="button" class="small' + (i ? ' ghost' : '') + '" data-gfile="' + BY_NUM[n].file + '">' + n + '</button>').join('') + '</div>';
+    }
+    panel.innerHTML = head + '<div id="gSpecBody"></div>';
+    renderSpecInto($('#gSpecBody'), BY_NUM[nums[0]].file);
+    if (window.innerWidth <= 980) $('#graphPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  $('#graphRows').addEventListener('click', e => {
+    const b = e.target.closest('[data-node]');
+    if (b) selectGraph(b.dataset.node);
+  });
+  $('#offGraph').addEventListener('click', e => {
+    const b = e.target.closest('[data-off]');
+    if (b) selectGraph(null, b.dataset.off);
+  });
+  $('#graphSpec').addEventListener('click', e => {
+    const b = e.target.closest('[data-gfile]');
+    if (!b) return;
+    b.parentElement.querySelectorAll('button').forEach(x => x.classList.add('ghost'));
+    b.classList.remove('ghost');
+    renderSpecInto($('#gSpecBody'), b.dataset.gfile);
+  });
+  let rz;
+  window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => drawEdges(hotSet), 80); });
+  if (window.ResizeObserver) new ResizeObserver(() => drawEdges(hotSet)).observe($('#graphBox'));
+
+  // Глобальные ссылки на спеки (канон, держатели, ссылки внутри markdown)
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[data-spec]');
+    if (!a) return;
+    e.preventDefault();
+    const inViewer = a.closest('#viewer');
+    openFile(a.dataset.spec, { scroll: !inViewer });
+  });
+
+  // ---------- Проверка баланса ----------
+  const TARGET = 110.347;
+  const KEYS = ['K', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'];
+  $('#balInputs').innerHTML = KEYS.map(k =>
+    '<label class="' + (k === 'K' ? 'k' : '') + '"><span>' + k + '</span><input inputmode="decimal" data-k="' + k + '" placeholder="' + (k === 'K' ? 'значение K' : '—') + '" aria-label="' + k + '"></label>').join('');
+  const inputs = KEYS.map(k => $('#balInputs input[data-k="' + k + '"]'));
+  const fmt = x => String(parseFloat(x.toFixed(9)));
+  function parse(v) {
+    v = v.trim().replace(/\s/g, '').replace(',', '.');
+    if (v === '') return { empty: true };
+    if (!/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(v)) return { bad: true };
+    return { val: Number(v) };
+  }
+  function check(fromReturn) {
+    let sum = 0, filled = 0, bad = 0;
+    const vals = [];
+    inputs.forEach(inp => {
+      const r = parse(inp.value);
+      inp.classList.toggle('bad', !!r.bad);
+      if (r.bad) bad++;
+      else if (!r.empty) { filled++; sum += r.val; }
+      vals.push(inp.value);
+    });
+    sum = Math.round(sum * 1e9) / 1e9;
+    const st = $('#balState'), title = $('#balTitle'), det = $('#balDetail'), ret = $('#balReturn');
+    $('#balSum').textContent = filled ? fmt(sum) : '—';
+    ret.classList.add('hidden');
+    if (bad) {
+      st.dataset.state = 'empty';
+      title.textContent = 'Есть нечисловые значения';
+      det.textContent = 'Исправь поля, подсвеченные красным. Дробная часть — через точку или запятую.';
+    } else if (filled < KEYS.length) {
+      st.dataset.state = 'empty';
+      title.textContent = filled ? 'Заполнено ' + filled + ' из 11' : 'Введите K и p1..p10';
+      det.textContent = 'Проверка S3 запускается, когда заданы все 11 значений: K + p1..p10.';
+    } else if (Math.abs(sum - TARGET) < 1e-9) {
+      st.dataset.state = 'ok';
+      title.textContent = 'K + p1..p10 = 110.347 ✓ Баланс замкнут';
+      det.innerHTML = fromReturn ? 'ВОЗВРАТ выполнен: восстановлено последнее сбалансированное состояние. Верификация пройдена.' : 'Инвариант соблюдён. Изменение вступит в силу только с подписями обоих держателей (S3, S4, S7).';
+      store.set('monomod.balance.last', JSON.stringify(vals));
+    } else {
+      const d = Math.round((sum - TARGET) * 1e9) / 1e9;
+      st.dataset.state = 'x4';
+      title.textContent = 'X4 → ВОЗВРАТ';
+      det.innerHTML = 'K + p1..p10 = <b>' + esc(fmt(sum)) + '</b> ≠ 110.347 (Δ = ' + (d > 0 ? '+' : '') + esc(fmt(d)) + ')' +
+        '<ul><li>оба держателя уведомляются одновременно</li><li>активируется X4</li><li>система блокируется до отката</li><li>далее: ВОЗВРАТ → верификация</li></ul>';
+      ret.classList.remove('hidden');
+      ret.textContent = store.get('monomod.balance.last') ? 'ВОЗВРАТ к последнему балансу' : 'ВОЗВРАТ (очистить)';
+    }
+  }
+  $('#balInputs').addEventListener('input', () => check(false));
+  $('#balClear').addEventListener('click', () => { inputs.forEach(i => { i.value = ''; }); check(false); });
+  $('#balReturn').addEventListener('click', () => {
+    let last = null;
+    try { last = JSON.parse(store.get('monomod.balance.last') || 'null'); } catch (e) { last = null; }
+    inputs.forEach((inp, i) => { inp.value = last ? (last[i] || '') : ''; });
+    check(!!last);
+  });
+  check(false);
+
+  // ---------- Навигация ----------
+  if (window.IntersectionObserver) {
+    const links = Object.fromEntries([...document.querySelectorAll('.nav a')].map(a => [a.getAttribute('href').slice(1), a]));
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(en => {
+        if (en.isIntersecting) {
+          Object.values(links).forEach(a => a.classList.remove('active'));
+          if (links[en.target.id]) links[en.target.id].classList.add('active');
+        }
+      });
+    }, { rootMargin: '-40% 0px -55% 0px' });
+    document.querySelectorAll('main > section').forEach(s => io.observe(s));
   }
 
-  var lastPart = partOfDay(new Date().getHours());
-  function startTicker() {
-    setInterval(function () {
-      updateClock();
-      applyTheme();
-      var part = partOfDay(new Date().getHours());
-      if (part !== lastPart) { lastPart = part; if (state.profile && !$('dashboard').classList.contains('hidden')) renderDashboard(); }
-    }, 15000);
-  }
-
-  init();
+  // ---------- Старт ----------
+  renderTabs();
+  renderGraph();
+  const m = location.hash.match(/^#spec=(.+)$/);
+  const start = m && BY_FILE[decodeURIComponent(m[1])] ? decodeURIComponent(m[1]) : '31-onepage.md';
+  openFile(start, { scroll: !!m, noHash: !m });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => drawEdges(hotSet));
 })();
