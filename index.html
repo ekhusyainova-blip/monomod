@@ -1,273 +1,85 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>MONOMOD · ONE PAGE v12.0 (канон)</title>
-  <meta name="description" content="MONOMOD — канон v12.0: формула, иерархия, CORE, 5 мод, сценарии, граф зависимостей, 32 спеки и правило двух держателей баланса.">
-  <meta name="theme-color" content="#0e0e0e">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111'/%3E%3Ctext x='32' y='44' font-size='34' font-family='Arial' font-weight='700' text-anchor='middle' fill='%237c5cff'%3EM%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MONOMOD · HOME3</title>
+<style>
+  :root { --bg: #0a0a0c; --accent: #4dd0c7; --text: #c8c8d4; }
+  body { margin: 0; height: 100vh; background: var(--bg); color: var(--text); 
+         font-family: 'Courier New', monospace; display: flex; flex-direction: column; overflow: hidden; }
+  #stage { flex-grow: 1; position: relative; display: flex; align-items: center; justify-content: center; }
+  .sphere {
+    width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+    opacity: 0; transform: scale(0.8);
+    transition: opacity 1.5s ease, transform 4s ease-in-out;
+  }
+  .sphere.active { opacity: 0.6; transform: scale(1.0); animation: breathe 6s infinite ease-in-out; }
+  .sphere.rupture { opacity: 0; transform: scale(0.5) blur(8px); transition: all 2s ease; }
+  @keyframes breathe {
+    0%, 100% { transform: scale(1.0); filter: blur(0px); }
+    50% { transform: scale(1.05); filter: blur(2px); }
+  }
+  #input-area { position: absolute; bottom: 20%; width: 60%; max-width: 500px; text-align: center; opacity: 0; transition: opacity 1s; }
+  #input-area.visible { opacity: 1; }
+  input { width: 100%; background: transparent; border: none; border-bottom: 1px solid #333; 
+          color: var(--text); font-size: 18px; text-align: center; outline: none; padding: 8px; }
+  #slider { height: 2px; background: #1a1a1e; width: 100%; position: relative; }
+  #slider-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.8s ease; }
+</style>
 </head>
 <body>
-  <header class="topbar">
-    <a class="logo" href="#canon" aria-label="MONOMOD — к канону">MONO<span>MOD</span></a>
-    <nav class="nav" aria-label="Разделы">
-      <a href="#canon">Канон</a>
-      <a href="#graph">Граф</a>
-      <a href="#files">32 файла</a>
-      <a href="#holders">Держатели</a>
-      <a href="#balance">Баланс</a>
-    </nav>
-    <button id="themeToggle" class="ghost small" type="button" title="Тема">◐ <span id="themeLabel">Авто</span></button>
-  </header>
+  <div id="stage">
+    <div id="sphere" class="sphere"></div>
+    <div id="input-area" class="visible">
+      <input type="text" id="user-input" placeholder="..." autocomplete="off">
+    </div>
+  </div>
+  <div id="slider"><div id="slider-fill"></div></div>
+<script>
+  const state = { phase: 'P0', durability: 1.0 };
+  const sphere = document.getElementById('sphere');
+  const inputArea = document.getElementById('input-area');
+  const input = document.getElementById('user-input');
+  const slider = document.getElementById('slider-fill');
 
-  <main>
-    <!-- КАНОН -->
-    <section id="canon" class="section hero">
-      <div class="eyebrow">MONOMOD · ONE PAGE v12.0 · <b>КАНОН</b></div>
-      <h1 class="formula" aria-label="Формула MONOMOD">
-        <span class="f-line">MONOMOD = <a data-spec="08-git-ops.md">GIT</a> ∘ <a data-spec="02-k.md">K</a> ∘ <a data-spec="09-vozvrat.md">ВОЗВРАТ</a> ∘ <a data-spec="10-argmax-s.md">argmax&nbsp;S</a> ∘ <span class="nw"><a data-spec="26-m-hash.md">M#</a> + <a data-spec="04-110.347.md" class="acc">110.347</a></span></span>
-        <span class="f-line f-eq">= <a data-spec="02-k.md">K</a> + <a data-spec="03-p1-p10.md">p1..p10</a></span>
-      </h1>
+  function transition(phase) {
+    state.phase = phase;
+    slider.style.width = phase === 'P0' ? '0%' : (phase === 'P7' ? '70%' : '100%');
+    
+    if (phase === 'P0') {
+      sphere.className = 'sphere';
+      inputArea.className = 'visible';
+      input.value = '';
+      input.focus();
+    } else if (phase === 'P3') {
+      inputArea.className = '';
+      sphere.className = 'sphere active';
+    } else if (phase === 'P7') {
+      sphere.className = 'sphere rupture';
+      setTimeout(() => transition('P10'), 2000);
+    } else if (phase === 'P10') {
+      sphere.className = 'sphere';
+      setTimeout(() => transition('P0'), 1000);
+    }
+  }
 
-      <div class="canon-grid">
-        <article class="card">
-          <h3>Иерархия</h3>
-          <p class="mono big"><a data-spec="12-hierarchy.md">𝕄_full ⊃ 𝕄+ ⊃ 𝕄++ ⊃ MONOMOD<small>(5 мод)</small></a></p>
-        </article>
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && input.value.trim()) {
+      transition('P3');
+      setTimeout(() => {
+        state.durability = Math.random();
+        if (state.durability < 0.15) {
+          transition('P7');
+        } else {
+          transition('P10');
+        }
+      }, 3000);
+    }
+  });
 
-        <article class="card">
-          <h3>CORE <small>(11 элементов)</small></h3>
-          <div class="chips">
-            <a class="chip" data-spec="26-m-hash.md">M#</a>
-            <a class="chip" data-spec="24-68.md">68</a>
-            <a class="chip" data-spec="25-194.md">194</a>
-            <a class="chip" data-spec="05-lambda6.md">Λ6</a>
-            <a class="chip" data-spec="06-gamma6.md">Γ6</a>
-            <a class="chip" data-spec="07-alpha6.md">Α6</a>
-          </div>
-          <div class="chips sub">
-            <a class="chip ghost" data-spec="14-borders.md">3 границы</a>
-            <a class="chip ghost" data-spec="15-roles.md">3 роли</a>
-            <a class="chip ghost" data-spec="32-versions.md">12 версий</a>
-            <a class="chip ghost" data-spec="30-registry.md">32 файла</a>
-          </div>
-        </article>
-
-        <article class="card span2">
-          <h3>Моды <small>(5)</small></h3>
-          <ol class="mods">
-            <li><a data-spec="17-mod-m1.md"><b>M1</b> Сборка <span>→ GIT ∘ K</span></a></li>
-            <li><a data-spec="18-mod-m2.md"><b>M2</b> Возврат <span>→ ВОЗВРАТ</span></a></li>
-            <li><a data-spec="19-mod-m3.md"><b>M3</b> Оптимизация <span>→ argmax S</span></a></li>
-            <li><a data-spec="20-mod-m4.md"><b>M4</b> Стабилизация <span>→ Λ6 · Γ6 · Α6</span></a></li>
-            <li><a data-spec="21-mod-m5.md"><b>M5</b> Фиксация <span>→ +110.347</span></a></li>
-          </ol>
-        </article>
-
-        <article class="card span2">
-          <h3>Сценарии <small>S1–S9 (базовые) + X1–X4 (сквозные)</small></h3>
-          <div class="scen">
-            <ul class="scen-list">
-              <li><b>S1</b> Onboarding <span>→ вход</span></li>
-              <li><b>S2</b> Возврат <span>→ синхронизация</span></li>
-              <li><b>S3</b> Верификация <span>→ K + p = 110.347</span></li>
-              <li><b>S4</b> Параметры <span>→ argmax S</span></li>
-              <li><b>S5</b> Композиция <span>→ D2</span></li>
-              <li><b>S6</b> Иерархия <span>→ D1</span></li>
-              <li><b>S7</b> Формула <span>→ D3</span></li>
-              <li><b>S8</b> Границы <span>→ Λ/Γ/Α</span></li>
-              <li><b>S9</b> Роли <span>→ переключение</span></li>
-            </ul>
-            <ul class="scen-list x">
-              <li><b>X1</b> Полный цикл <span>→ S1→S4→S5→S8→S9→S2</span></li>
-              <li><b>X2</b> Держатели <span>→ S3⇄S4⇄S8</span></li>
-              <li><b>X3</b> Релиз <span>→ S6→S7→S9→фиксация</span></li>
-              <li><b>X4</b> Аварийный <span>→ триггер→откат→верификация</span></li>
-            </ul>
-          </div>
-          <p class="links"><a data-spec="22-scenarios-s1-s9.md">22-scenarios-s1-s9.md</a> · <a data-spec="23-scenarios-x1-x4.md">23-scenarios-x1-x4.md</a></p>
-        </article>
-
-        <article class="card">
-          <h3>Ветки</h3>
-          <ul class="plain">
-            <li><a data-spec="12-hierarchy.md"><b>D1</b> — иерархия</a></li>
-            <li><a data-spec="11-compose.md"><b>D2</b> — композиция</a></li>
-            <li><a data-spec="13-formula.md"><b>D3</b> — формула с 110.347</a></li>
-          </ul>
-        </article>
-
-        <article class="card">
-          <h3>Правило</h3>
-          <p class="lead">Два человека держат баланс.</p>
-          <ul class="plain">
-            <li><a href="#holders">Держатель #1 — <b>Страж K</b></a></li>
-            <li><a href="#holders">Держатель #2 — <b>Страж S</b></a></li>
-            <li>Veto: у каждого</li>
-            <li>Обязательные подписи: <b>S3, S4, S7, X4</b></li>
-          </ul>
-        </article>
-
-        <article class="card accent-card">
-          <h3>Инвариант</h3>
-          <p class="mono big">K + p1..p10 = 110.347 <small>(всегда)</small></p>
-          <p class="mono">При ≠ → X4 → ВОЗВРАТ → верификация</p>
-          <a class="btn-link" href="#balance">Проверить баланс →</a>
-        </article>
-
-        <article class="card">
-          <h3>Версии · Файлы</h3>
-          <ul class="plain">
-            <li><a data-spec="32-versions.md">v1.0 → v12.0 (12 итераций)</a></li>
-            <li><b>v12.0 = канон</b></li>
-            <li><a href="#files">32 one-page спеки</a></li>
-            <li>Реестр: <a data-spec="30-registry.md">30-registry.md</a></li>
-            <li>Канон: <a data-spec="31-onepage.md">31-onepage.md</a></li>
-          </ul>
-        </article>
-      </div>
-
-      <div class="sealed mono">ЗАМКНУТО ✓ <i>|</i> 110.347 подтверждено <i>|</i> v12.0 готово</div>
-    </section>
-
-    <!-- ГРАФ -->
-    <section id="graph" class="section">
-      <div class="section-head">
-        <h2>Граф зависимостей</h2>
-        <p class="muted">Нажми на узел: откроется спека, а ниже по графу подсветится всё, что от него зависит.</p>
-      </div>
-      <div class="graph-wrap">
-        <div class="graph" id="graphBox">
-          <svg class="edges" id="edges" aria-hidden="true"></svg>
-          <div id="graphRows"></div>
-          <div class="offgraph">
-            <span class="muted">На схеме канона не изображены:</span>
-            <div class="chips" id="offGraph"></div>
-          </div>
-        </div>
-        <aside class="graph-panel card" id="graphPanel" aria-live="polite">
-          <h3>Правила зависимостей</h3>
-          <ul class="rules" id="rulesList">
-            <li data-rule="core">Изменение в <b>01-core</b> → пересчёт всех 32 файлов</li>
-            <li data-rule="kp">Изменение в <b>02-k</b> или <b>03-p*</b> → триггер <b>04-110.347</b> → возможен <b>X4</b></li>
-            <li data-rule="borders">Изменение в <b>05/06/07</b> (границы) → пересборка мод <b>M4</b></li>
-            <li data-rule="formula">Изменение в <b>13-formula</b> → только через <b>D3</b> с двумя подписями</li>
-          </ul>
-          <div id="graphSpec" class="graph-spec"><p class="muted">Выбери узел на графе.</p></div>
-        </aside>
-      </div>
-    </section>
-
-    <!-- ФАЙЛЫ -->
-    <section id="files" class="section">
-      <div class="section-head">
-        <h2>32 one-page спеки</h2>
-        <p class="muted">Файлы лежат в папке <code>specs/</code> репозитория и подгружаются отсюда как есть.</p>
-      </div>
-      <div class="tabs" id="layerTabs" role="tablist"></div>
-      <div class="browser">
-        <ul class="file-list" id="fileList"></ul>
-        <article class="viewer card" id="viewer"><p class="muted">Выбери файл.</p></article>
-      </div>
-    </section>
-
-    <!-- ДЕРЖАТЕЛИ -->
-    <section id="holders" class="section">
-      <div class="section-head">
-        <h2>Два держателя баланса</h2>
-        <p class="muted">Ни одно изменение K или p1..p10 не вступает в силу без двух подписей.</p>
-      </div>
-      <div class="holders">
-        <article class="card holder">
-          <div class="h-tag">Держатель #1</div>
-          <h3>«Страж K»</h3>
-          <dl>
-            <dt>Функция</dt><dd>Хранит и подтверждает K</dd>
-            <dt>Права</dt><dd>Veto на изменение K, p1..p10, 110.347</dd>
-            <dt>Обязан</dt><dd>Подписывать S3, S4, S7, X4</dd>
-            <dt>Запрещено</dt><dd>Единолично менять формулу</dd>
-            <dt>Зона контроля</dt><dd><a data-spec="02-k.md">02-k.md</a>, <a data-spec="04-110.347.md">04-110.347.md</a></dd>
-            <dt>Триггер активации</dt><dd>Любое изменение K или расхождение баланса</dd>
-            <dt>Отчётность</dt><dd>Лог <a data-spec="28-log-control.md">28-log-control.md</a></dd>
-          </dl>
-        </article>
-        <article class="card holder">
-          <div class="h-tag">Держатель #2</div>
-          <h3>«Страж S»</h3>
-          <dl>
-            <dt>Функция</dt><dd>Контролирует argmax S и p-параметры</dd>
-            <dt>Права</dt><dd>Veto на изменение p1..p10, границ Λ/Γ/Α</dd>
-            <dt>Обязан</dt><dd>Подписывать S3, S4, S7, X4</dd>
-            <dt>Запрещено</dt><dd>Единолично менять формулу</dd>
-            <dt>Зона контроля</dt><dd><a data-spec="03-p1-p10.md">03-p*.md</a>, <a data-spec="10-argmax-s.md">10-argmax-s.md</a></dd>
-            <dt>Триггер активации</dt><dd>Любой пересчёт p-параметров</dd>
-            <dt>Отчётность</dt><dd>Лог <a data-spec="28-log-control.md">28-log-control.md</a></dd>
-          </dl>
-        </article>
-      </div>
-
-      <div class="holders-bottom">
-        <article class="card">
-          <h3>Матрица ответственности</h3>
-          <div class="table-wrap">
-            <table class="matrix">
-              <thead><tr><th>Действие</th><th>Держатель #1</th><th>Держатель #2</th></tr></thead>
-              <tbody>
-                <tr><td>Изменение K</td><td>✅ инициатор</td><td>✅ подпись</td></tr>
-                <tr><td>Изменение p1..p10</td><td>✅ подпись</td><td>✅ инициатор</td></tr>
-                <tr><td>Пересчёт 110.347</td><td>✅ обязательно</td><td>✅ обязательно</td></tr>
-                <tr><td>Изменение границ</td><td>⚪ уведомление</td><td>✅ решение</td></tr>
-                <tr><td>Релиз версии</td><td>✅ подпись</td><td>✅ подпись</td></tr>
-                <tr><td>X4 активация</td><td>✅ обязательно</td><td>✅ обязательно</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </article>
-        <article class="card">
-          <h3>Правило баланса (канон)</h3>
-          <ol class="rule-list">
-            <li>Ни одно изменение K или p1..p10 не вступает в силу без двух подписей.</li>
-            <li>При расхождении K + p1..p10 ≠ 110.347:
-              <ul><li>оба держателя уведомляются одновременно</li><li>активируется X4</li><li>система блокируется до отката</li></ul></li>
-            <li>При конфликте держателей:
-              <ul><li>приоритет у Держателя #1 по K</li><li>приоритет у Держателя #2 по S</li><li>при взаимном veto → стоп + эскалация</li></ul></li>
-            <li>Смена держателя:
-              <ul><li>только с согласия второго</li><li>запись в 28-log-control.md</li></ul></li>
-          </ol>
-        </article>
-      </div>
-    </section>
-
-    <!-- БАЛАНС -->
-    <section id="balance" class="section">
-      <div class="section-head">
-        <h2>Проверка баланса · S3 Верификация</h2>
-        <p class="muted">Канон не задаёт значения K и p1..p10, поэтому введи их сам. Страница сравнит сумму с 110.347.</p>
-      </div>
-      <div class="balance">
-        <form class="card bal-form" id="balForm" autocomplete="off" onsubmit="return false">
-          <div class="bal-inputs" id="balInputs"></div>
-          <div class="bal-actions">
-            <button type="button" class="ghost small" id="balClear">Очистить</button>
-          </div>
-        </form>
-        <div class="card bal-state" id="balState" data-state="empty">
-          <div class="bal-sum mono"><span id="balSum">—</span> <i>vs</i> <b>110.347</b></div>
-          <div class="bal-title" id="balTitle">Введите K и p1..p10</div>
-          <div class="bal-detail" id="balDetail"></div>
-          <button type="button" class="small hidden" id="balReturn">ВОЗВРАТ</button>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer class="footer">
-    <span>MONOMOD · канон v12.0</span>
-    <a href="https://github.com/ekhusyainova-blip/monomod" target="_blank" rel="noopener">Репозиторий на GitHub</a>
-  </footer>
-
-  <script src="app.js"></script>
+  transition('P0');
+</script>
 </body>
 </html>
