@@ -3,40 +3,66 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MONOMOD · Минимум</title>
+<title>MONOMOD</title>
 <style>
-  :root { --bg: #0a0a0c; --accent: #4dd0c7; --text: #c8c8d4; }
-  body { margin: 0; height: 100vh; background: var(--bg); color: var(--text); 
-         font-family: 'Courier New', monospace; display: flex; flex-direction: column; overflow: hidden; }
-  #stage { flex-grow: 1; position: relative; display: flex; align-items: center; justify-content: center; }
+  :root { --bg: #0a0a0c; --accent: #4dd0c7; --text: #c8c8d4; --gold: #ffd700; }
+  * { box-sizing: border-box; }
+  body { 
+    margin: 0; height: 100vh; background: var(--bg); color: var(--text); 
+    font-family: 'Courier New', monospace; 
+    display: flex; flex-direction: column; overflow: hidden; 
+  }
+  
+  #stage { 
+    flex-grow: 1; position: relative; 
+    display: flex; align-items: center; justify-content: center; 
+  }
+  
   .sphere {
     width: 120px; height: 120px; border-radius: 50%;
     background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
-    opacity: 0; transform: scale(0.8); transition: opacity 1.5s ease;
+    opacity: 0; transform: scale(0.8);
+    transition: opacity 1.5s ease, transform 4s ease-in-out, background 1s;
   }
-  .sphere.active { opacity: 0.6; transform: scale(1.0); animation: breathe 6s infinite ease-in-out; }
-  .sphere.rupture { opacity: 0; transform: scale(0.5); filter: blur(8px); transition: all 2s ease; }
-  @keyframes breathe { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05);filter:blur(2px)} }
+  .sphere.active { 
+    opacity: 0.6; transform: scale(1.0); 
+    animation: breathe 6s infinite ease-in-out; 
+  }
+  .sphere.rupture { 
+    opacity: 0; transform: scale(0.5); filter: blur(8px); 
+    transition: all 2s ease; 
+  }
+  .sphere.golden { 
+    background: radial-gradient(circle, var(--gold) 0%, transparent 70%); 
+    opacity: 0.8;
+    box-shadow: 0 0 40px rgba(255, 215, 0, 0.4);
+  }
   
-  #input-area { position: absolute; bottom: 20%; width: 60%; max-width: 500px; text-align: center; opacity: 0; transition: opacity 1s; }
+  @keyframes breathe { 
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); filter: blur(2px); }
+  }
+  
+  #input-area { 
+    position: absolute; bottom: 20%; width: 60%; max-width: 500px; 
+    text-align: center; opacity: 0; transition: opacity 1s; 
+  }
   #input-area.visible { opacity: 1; }
-  input { width: 100%; background: transparent; border: none; border-bottom: 1px solid #333; 
-    color: var(--text); font-size: 18px; text-align: center; outline: none; padding: 8px; font-family: inherit; }
   
-  #slider { height: 2px; background: #1a1a1e; width: 100%; }
-  #slider-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.8s ease; }
+  input { 
+    width: 100%; background: transparent; border: none; 
+    border-bottom: 1px solid #333; 
+    color: var(--text); font-size: 18px; text-align: center; 
+    outline: none; padding: 8px; font-family: inherit; 
+  }
   
-  #log { position: absolute; top: 10px; right: 10px; width: 320px; max-height: 50vh;
-    overflow-y: auto; font-size: 11px; color: #888; background: rgba(0,0,0,0.7);
-    padding: 10px; border-radius: 4px; border: 1px solid #222; }
-  .log-entry { margin-bottom: 5px; padding: 3px 3px 3px 8px; border-left: 2px solid #444; }
-  .log-entry.A { border-color: #ff6b9d; color: #ff9ebb; }
-  .log-entry.B { border-color: #4dd0c7; color: #8be9de; }
-  .log-entry.C { border-color: #ffa502; color: #ffc466; }
-  .log-entry.D { border-color: #a78bfa; color: #c4b5fd; }
-  
-  #memory-info { position: absolute; top: 10px; left: 10px; font-size: 10px; color: #555;
-    background: rgba(0,0,0,0.5); padding: 8px; border-radius: 4px; }
+  #slider { 
+    height: 2px; background: #1a1a1e; width: 100%; 
+  }
+  #slider-fill { 
+    height: 100%; background: var(--accent); width: 0%; 
+    transition: width 0.8s ease; 
+  }
 </style>
 </head>
 <body>
@@ -44,24 +70,16 @@
 <div id="stage">
   <div id="sphere" class="sphere"></div>
   <div id="input-area" class="visible">
-    <input type="text" id="user-input" placeholder="Введите акт..." autocomplete="off">
+    <input type="text" id="user-input" placeholder="..." autocomplete="off">
   </div>
-  
-  <div id="memory-info">
-    <div>Связи: <span id="mem-links">0</span></div>
-    <div>Акты: <span id="mem-acts">0</span></div>
-  </div>
-  
-  <div id="log"></div>
 </div>
 <div id="slider"><div id="slider-fill"></div></div>
 
 <script>
 // ============================================================================
-// МИНИМУМ: ТОЛЬКО РАБОЧЕЕ
+// СИСТЕМА (без UI-элементов)
 // ============================================================================
 
-// 1. LINK GRAPH (обучение на словах)
 const LINK_GRAPH = {
     edges: new Map(),
     
@@ -72,6 +90,10 @@ const LINK_GRAPH = {
         link.count++;
         link.lastUsed = Date.now();
         this.edges.set(key, link);
+        
+        if (link.count >= 3 && link.weight > 0.5) {
+            TemplateArchive.tryCreate([w1, w2], dim, link.weight);
+        }
     },
     
     decay() {
@@ -82,7 +104,6 @@ const LINK_GRAPH = {
                 link.weight *= 0.9;
                 if (link.weight < 0.15) {
                     this.edges.delete(key);
-                    addLog(`[P7] Смерть: ${key}`, 'C');
                 }
             }
         }
@@ -98,7 +119,60 @@ const LINK_GRAPH = {
     }
 };
 
-// 2. MEMORY (история актов)
+const TemplateArchive = {
+    archive: new Map(),
+    
+    generateId(words) {
+        const str = words.slice().sort().join('|').toLowerCase();
+        let h = 0;
+        for (let i = 0; i < str.length; i++) {
+            h = ((h << 5) - h) + str.charCodeAt(i);
+            h |= 0;
+        }
+        return 'TPL-' + Math.abs(h).toString(16).padStart(8, '0').slice(0, 8);
+    },
+    
+    tryCreate(words, dim, weight) {
+        const id = this.generateId(words);
+        
+        if (this.archive.has(id)) {
+            const t = this.archive.get(id);
+            t.lastUsed = Date.now();
+            t.usageCount++;
+            return;
+        }
+        
+        const template = {
+            id,
+            words: words.slice().sort(),
+            dim,
+            weight: +weight.toFixed(3),
+            created: Date.now(),
+            lastUsed: Date.now(),
+            usageCount: 1
+        };
+        
+        this.archive.set(id, template);
+        this.save();
+        showGoldenSphere();
+    },
+    
+    init() {
+        const saved = localStorage.getItem('mm_templates');
+        if (saved) {
+            try {
+                this.archive = new Map(JSON.parse(saved));
+            } catch(e) {
+                this.archive = new Map();
+            }
+        }
+    },
+    
+    save() {
+        localStorage.setItem('mm_templates', JSON.stringify(Array.from(this.archive.entries())));
+    }
+};
+
 const Memory = {
     trail: [],
     maxSize: 110,
@@ -118,34 +192,35 @@ const Memory = {
     }
 };
 
-// 3. UI
+// ============================================================================
+// UI (минимум)
+// ============================================================================
+
 const sphere = document.getElementById('sphere');
 const inputArea = document.getElementById('input-area');
 const input = document.getElementById('user-input');
 const slider = document.getElementById('slider-fill');
-const logEl = document.getElementById('log');
 
-function addLog(msg, f) {
-    const d = document.createElement('div');
-    d.className = `log-entry ${f}`;
-    d.textContent = `[${f}] ${msg}`;
-    logEl.appendChild(d);
-    logEl.scrollTop = logEl.scrollHeight;
-    if (logEl.children.length > 50) logEl.removeChild(logEl.firstChild);
-}
-
-function updateMemoryInfo() {
-    document.getElementById('mem-links').textContent = LINK_GRAPH.edges.size;
-    document.getElementById('mem-acts').textContent = Memory.trail.length;
+function showGoldenSphere() {
+    sphere.className = 'sphere golden';
+    setTimeout(() => {
+        if (sphere.classList.contains('golden')) {
+            sphere.className = 'sphere active';
+        }
+    }, 3000);
 }
 
 function transition(phase) {
     slider.style.width = phase === 'P0' ? '0%' : (phase === 'P7' ? '70%' : '100%');
+    
     if (phase === 'P0') {
-        sphere.className = 'sphere'; inputArea.className = 'visible';
-        input.value = ''; input.focus();
+        sphere.className = 'sphere';
+        inputArea.className = 'visible';
+        input.value = '';
+        input.focus();
     } else if (phase === 'P3') {
-        inputArea.className = ''; sphere.className = 'sphere active';
+        inputArea.className = '';
+        sphere.className = 'sphere active';
     } else if (phase === 'P7') {
         sphere.className = 'sphere rupture';
         setTimeout(() => transition('P0'), 2500);
@@ -155,81 +230,63 @@ function transition(phase) {
     }
 }
 
-// 4. ABCD КОНВЕЙЕР (минимум)
-const FA = {
-    execute(raw) {
-        addLog('Акт: "' + raw + '"', 'A');
-        const cleaned = raw.trim().replace(/[^\w\sа-яА-ЯёЁ]/g, '').toLowerCase();
-        const words = cleaned.split(/\s+/).filter(w => w.length > 2);
-        if (words.length === 0) { transition('P0'); return; }
-        FB.execute(words);
-    }
-};
+// ============================================================================
+// ABCD КОНВЕЙЕР
+// ============================================================================
 
-const FB = {
-    execute(words) {
-        addLog('Слова: ' + words.join(', '), 'B');
-        FC.execute(words);
+function processInput(raw) {
+    const cleaned = raw.trim().replace(/[^\w\sа-яА-ЯёЁ]/g, '').toLowerCase();
+    const words = cleaned.split(/\s+/).filter(w => w.length > 2);
+    
+    if (words.length === 0) {
+        transition('P0');
+        return;
     }
-};
-
-const FC = {
-    execute(words) {
-        // Обучение: укрепление связей
-        for (let i = 0; i < words.length; i++)
-            for (let j = i + 1; j < words.length; j++)
-                LINK_GRAPH.strengthen(words[i], words[j], '3D');
-        
-        // Расчёт прочности
-        let tw = 0, lc = 0;
-        for (let i = 0; i < words.length; i++)
-            for (let j = i + 1; j < words.length; j++) {
-                const k = [words[i], words[j]].sort().join('→');
-                const l = LINK_GRAPH.edges.get(k);
-                if (l) { tw += l.weight; lc++; }
-            }
-        
-        const dur = lc > 0 ? tw / lc : 0.2;
-        addLog('Прочность: ' + dur.toFixed(3), 'C');
-        
-        // Затухание
-        LINK_GRAPH.decay();
-        
-        // Запись в память
-        Memory.record(words, '3D', dur);
-        
-        // Сохранение
-        LINK_GRAPH.save();
-        Memory.save();
-        updateMemoryInfo();
-        
-        FD.execute(dur);
-    }
-};
-
-const FD = {
-    execute(dur) {
-        if (dur < 0.15) {
-            addLog('Решение: РАЗРЫВ', 'D');
-            transition('P7');
-        } else {
-            addLog('Решение: УДЕРЖАНИЕ', 'D');
-            transition('P10');
+    
+    // Обучение
+    for (let i = 0; i < words.length; i++) {
+        for (let j = i + 1; j < words.length; j++) {
+            LINK_GRAPH.strengthen(words[i], words[j], '3D');
         }
     }
-};
+    
+    // Прочность
+    let tw = 0, lc = 0;
+    for (let i = 0; i < words.length; i++) {
+        for (let j = i + 1; j < words.length; j++) {
+            const k = [words[i], words[j]].sort().join('→');
+            const l = LINK_GRAPH.edges.get(k);
+            if (l) { tw += l.weight; lc++; }
+        }
+    }
+    
+    const dur = lc > 0 ? tw / lc : 0.2;
+    
+    LINK_GRAPH.decay();
+    Memory.record(words, '3D', dur);
+    LINK_GRAPH.save();
+    Memory.save();
+    
+    if (dur < 0.15) {
+        transition('P7');
+    } else {
+        transition('P10');
+    }
+}
 
-// 5. СТАРТ
+// ============================================================================
+// СТАРТ
+// ============================================================================
+
 LINK_GRAPH.init();
 Memory.init();
+TemplateArchive.init();
 transition('P0');
-updateMemoryInfo();
-addLog('HOME3 · Минимум активен.', 'A');
 
 input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && input.value.trim()) {
         transition('P3');
-        setTimeout(() => FA.execute(input.value), 800);
+        setTimeout(() => processInput(input.value), 800);
     }
 });
 </script>
