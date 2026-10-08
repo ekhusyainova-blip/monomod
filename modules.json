@@ -1,6 +1,8 @@
 [
   "mm-id.js",
   "mm-core.js",
+  "mm-learn.js",
+  "mm-query.js",
   "mm-links.js",
   "mm-fragments.js",
   "mm-spheres.js",
@@ -8,5 +10,7 @@
   "mm-ui.js",
   "mm-viz.js",
   "mm-input.js",
+  "mm-export.js",
+  "mm-autopilot.js",
   "mm-pwa.js"
 ]
