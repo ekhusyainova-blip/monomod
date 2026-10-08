@@ -1,4 +1,9 @@
 (function (M) {
+  /* ==========================================================================
+     MM-VIZ — визуализация
+     Точка MONOMODE в центре. Сферу рисует база.
+     ========================================================================== */
+
   const Viz = {
     canvas: null, ctx: null, raf: null,
 
@@ -10,10 +15,12 @@
       this.canvas.style.cssText = [
         'position:absolute',
         'inset:0',
-        'pointer-events:none',   // ← НЕ перехватывает ввод
+        'pointer-events:none',   // не мешает вводу
         'z-index:1',
       ].join(';');
       stage.appendChild(this.canvas);
+
+      this.ctx = this.canvas.getContext('2d');
 
       this.resize();
       window.addEventListener('resize', () => this.resize());
@@ -38,27 +45,35 @@
       const cy = canvas.height / 2;
 
       // есть ли граф?
-      const graph = M.core ? M.core.graph() : [];
-      const hasGraph = graph.length > 0;
+      let hasGraph = false;
+      try {
+        const g = JSON.parse(localStorage.getItem('mm_graph') || '[]');
+        hasGraph = g.length > 0;
+      } catch {}
 
-      // пульсация
+      // пульсация точки MONOMODE
       const t = Date.now() / 1500;
-      const pulse = 1 + Math.sin(t) * 0.05;
-      const r = 60 * pulse;
+      const pulse = 1 + Math.sin(t) * 0.15;
+      const r = (hasGraph ? 6 : 3) * pulse;
 
-      // градиент — присутствие MONOMODE
-      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      // градиент вокруг точки
+      const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, 40);
       if (hasGraph) {
-        g.addColorStop(0, 'rgba(77,208,199,0.5)');
-        g.addColorStop(1, 'rgba(77,208,199,0)');
+        grd.addColorStop(0, 'rgba(77,208,199,0.6)');
+        grd.addColorStop(1, 'rgba(77,208,199,0)');
       } else {
-        g.addColorStop(0, 'rgba(77,208,199,0.15)');
-        g.addColorStop(1, 'rgba(77,208,199,0)');
+        grd.addColorStop(0, 'rgba(77,208,199,0.2)');
+        grd.addColorStop(1, 'rgba(77,208,199,0)');
       }
+      ctx.beginPath();
+      ctx.arc(cx, cy, 40, 0, Math.PI * 2);
+      ctx.fillStyle = grd;
+      ctx.fill();
 
+      // сама точка
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fillStyle = g;
+      ctx.fillStyle = hasGraph ? '#4dd0c7' : 'rgba(77,208,199,0.4)';
       ctx.fill();
     },
   };
