@@ -3,7 +3,7 @@
    Кэширует всё ядро + модули. Работает офлайн.
    ============================================================================ */
 
-const CACHE = 'monomod-v4';
+const CACHE = 'monomod-v5';
 const URLS = [
   './', './index.html', './monomode.js',
   './mm-id.js', './mm-core.js', './mm-learn.js', './mm-query.js',
