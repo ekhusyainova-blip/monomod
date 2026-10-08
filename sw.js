@@ -3,7 +3,7 @@
    Кэширует всё ядро + модули. Работает офлайн.
    ============================================================================ */
 
-const CACHE = 'monomod-min-v1';
+const CACHE = 'monomod-v9';   // ← менять при каждом обновлении
 const URLS = [
   './', './index.html', './monomode.js',
   './mm-query.js', './mm-input.js', './mm-viz.js', './mm-ui.js',
@@ -25,7 +25,6 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
-
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
