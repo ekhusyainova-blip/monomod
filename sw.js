@@ -3,13 +3,10 @@
    Кэширует всё ядро + модули. Работает офлайн.
    ============================================================================ */
 
-const CACHE = 'monomod-v8';
+const CACHE = 'monomod-min-v1';
 const URLS = [
   './', './index.html', './monomode.js',
-  './mm-id.js', './mm-core.js', './mm-learn.js', './mm-query.js',
-  './mm-links.js', './mm-fragments.js', './mm-manifest.js',
-  './mm-spheres.js', './mm-auth.js', './mm-ui.js', './mm-viz.js',
-  './mm-input.js', './mm-pwa.js',
+  './mm-query.js', './mm-input.js', './mm-viz.js', './mm-ui.js',
 ];
 
 self.addEventListener('install', (e) => {
