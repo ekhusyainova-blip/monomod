@@ -5,18 +5,11 @@
 
 const CACHE = 'monomod-v4';
 const URLS = [
-  './',
-  './index.html',
-  './monomode.js',
-  './mm-id.js',
-  './mm-core.js',
-  './mm-spheres.js',
-  './mm-links.js',   // ← новый модуль родословной
-  './mm-auth.js',
-  './mm-ui.js',
-  './mm-viz.js',
-  './mm-input.js',
-  './mm-pwa.js',
+  './', './index.html', './monomode.js',
+  './mm-id.js', './mm-core.js', './mm-learn.js', './mm-query.js',
+  './mm-links.js', './mm-fragments.js', './mm-spheres.js',
+  './mm-auth.js', './mm-ui.js', './mm-viz.js', './mm-input.js',
+  './mm-export.js', './mm-autopilot.js', './mm-pwa.js',
 ];
 
 self.addEventListener('install', (e) => {
