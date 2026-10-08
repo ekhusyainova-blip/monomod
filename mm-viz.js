@@ -13,59 +13,49 @@
       this.canvas.addEventListener('click', (e) => this.onClick(e));
       this.loop();
     },
+
     resize() {
       const r = this.canvas.parentElement.getBoundingClientRect();
-      this.canvas.width = r.width; this.canvas.height = r.height;
+      this.canvas.width = r.width;
+      this.canvas.height = r.height;
     },
 
-    // сферы с их «весом» — активность из trail
     spheres() {
       const cur = M.id.current();
       const list = M.spheres.list();
       const focus = this.focus || cur;
       const current = list.find(s => s.id === cur);
 
-      return list.map((s, i) => {
+      return list.map((s) => {
         const snap = M.core.snapshot(s.id);
-        const active = (cur === s.id) || (current && s.parent === current.id) ||
+        const active = (cur === s.id) ||
+                       (current && s.parent === current.id) ||
                        (current && current.parent === s.id);
         const isFocus = s.id === focus;
-        const lineage = M.id.lineage(s.id).length;
-
-        // вес = активность: trail последних записей
         const trail = M.core.trail(s.id);
         const last = trail.length ? trail[trail.length - 1].ts : 0;
-        const freshness = last ? Math.max(0, 1 - (Date.now() - last) / (1000 * 60 * 60 * 24)) : 0;
-
-        return {
-          ...s,
-          active,
-          isFocus,
-          lineage,
-          freshness,
-          edges: snap.edges,
-          breath: snap.trail > 0 ? 1 : 0,
-        };
+        const freshness = last
+          ? Math.max(0, 1 - (Date.now() - last) / (1000 * 60 * 60 * 24))
+          : 0;
+        return { ...s, active, isFocus, freshness, edges: snap.edges, breath: snap.trail > 0 ? 1 : 0 };
       });
     },
 
     layout(list) {
-      const cx = this.canvas.width / 2, cy = this.canvas.height / 2;
+      const cx = this.canvas.width / 2;
+      const cy = this.canvas.height / 2;
       const R = Math.min(cx, cy) * 0.6;
       const focus = list.find(s => s.isFocus);
       const out = [];
 
-      // фокус — в центре
       if (focus) out.push({ ...focus, x: cx, y: cy, r: 64 * (0.6 + 0.4 * focus.freshness) });
 
-      // прямые связи фокуса — вокруг
       const near = list.filter(s => !s.isFocus && (s.parent === focus?.id || focus?.parent === s.id));
       near.forEach((s, i) => {
         const a = (i / Math.max(1, near.length)) * Math.PI * 2 - Math.PI / 2;
         out.push({ ...s, x: cx + Math.cos(a) * R * 0.55, y: cy + Math.sin(a) * R * 0.55, r: 36 * (0.6 + 0.4 * s.freshness) });
       });
 
-      // дальние — фон, точки
       const far = list.filter(s => !out.find(o => o.id === s.id));
       far.forEach((s, i) => {
         const a = (i / Math.max(1, far.length)) * Math.PI * 2;
@@ -81,12 +71,19 @@
       const x = e.clientX - r.left, y = e.clientY - r.top;
       for (const p of this.layout(this.spheres())) {
         if (Math.hypot(x - p.x, y - p.y) < Math.max(p.r, 8) + 6) {
-          if (p.far) { this.focus = p.id; }
+          if (p.far) this.focus = p.id;
           else { M.spheres.switchTo(p.id); this.focus = null; }
           return;
         }
       }
       this.focus = null;
+    },
+
+    // вес связи родословной
+    linkWeight(a, b) {
+      if (!M.links) return 0.3;
+      const w = M.links.weight(a, b);
+      return w || 0.05;
     },
 
     loop() {
@@ -98,23 +95,34 @@
       const points = this.layout(list);
       const t = Date.now() / 1500;
 
-      // связи
+      // --- рёбра родословной (сферы) ---
       for (const p of points) {
         if (!p.parent) continue;
         const par = points.find(x => x.id === p.parent);
         if (!par) continue;
+
+        const w = this.linkWeight(p.parent, p.id);
+        const alpha = Math.max(0.04, w * 0.5);
+        const lineW = 0.5 + w * 2.5;
+        const alive = w > 0.15;
+
         ctx.beginPath();
         ctx.moveTo(par.x, par.y);
         ctx.lineTo(p.x, p.y);
-        ctx.strokeStyle = p.active ? 'rgba(77,208,199,0.25)' : 'rgba(77,208,199,0.06)';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = !alive
+          ? `rgba(200,90,90,${alpha * 0.6})`              // слабая/рвущаяся — красноватая
+          : p.active
+            ? `rgba(77,208,199,${alpha})`
+            : `rgba(77,208,199,${alpha * 0.35})`;
+        ctx.lineWidth = lineW;
+        ctx.setLineDash(alive ? [] : [3, 4]);              // рвущаяся — пунктир
         ctx.stroke();
+        ctx.setLineDash([]);
       }
 
-      // сферы
+      // --- сферы ---
       for (const p of points) {
         if (p.far) {
-          // дальняя — точка
           ctx.beginPath();
           ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
           ctx.fillStyle = p.breath ? 'rgba(77,208,199,0.5)' : 'rgba(120,120,140,0.2)';
@@ -122,7 +130,6 @@
           continue;
         }
 
-        // локальная — сфера с пульсацией
         const pulse = p.active ? 1 + Math.sin(t + p.x * 0.01) * 0.05 : 1;
         const rr = p.r * pulse;
 
@@ -142,7 +149,6 @@
         ctx.fillStyle = g;
         ctx.fill();
 
-        // подпись только у активных
         if (p.active && !p.far) {
           ctx.fillStyle = p.isFocus ? 'rgba(255,215,0,0.9)' : 'rgba(200,200,212,0.6)';
           ctx.font = '10px "Courier New", monospace';
@@ -152,6 +158,7 @@
       }
     },
   };
+
   M.viz = Viz;
   M.modules.viz = Viz;
   M.on('mm:ready', () => Viz.init());
