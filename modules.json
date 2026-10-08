@@ -1,0 +1,12 @@
+[
+  "mm-id.js",
+  "mm-core.js",
+  "mm-links.js",
+  "mm-fragments.js",
+  "mm-spheres.js",
+  "mm-auth.js",
+  "mm-ui.js",
+  "mm-viz.js",
+  "mm-input.js",
+  "mm-pwa.js"
+]
