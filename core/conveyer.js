@@ -23,10 +23,19 @@
     }
 
     // усиление
+    // парные связи (все пары)
     for (let i = 0; i < words.length; i++) {
       for (let j = i + 1; j < words.length; j++) {
         M.graph.strengthen(words[i], words[j], '3D');
       }
+    }
+    // §bigram · последовательные пары
+    for (let i = 0; i < words.length - 1; i++) {
+      M.graph.observeSequence(words[i], words[i + 1]);
+    }
+    // §trigram · последовательные тройки
+    for (let i = 0; i < words.length - 2; i++) {
+      M.graph.observeTriple(words[i], words[i + 1], words[i + 2]);
     }
 
     // прочность
