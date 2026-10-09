@@ -1,0 +1,11 @@
+{
+  "name": "MONOMOD",
+  "short_name": "MONOMOD",
+  "description": "L0 seed · 1:1:1",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0a0a0c",
+  "theme_color": "#4dd0c7",
+  "lang": "ru",
+  "icons": []
+}
