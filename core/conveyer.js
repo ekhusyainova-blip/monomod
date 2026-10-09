@@ -57,7 +57,11 @@
       durability: +dur.toFixed(3),
     });
 
-    // переход
++   // §gen · генерация только при удачном маршруте
++   if (dur >= THRESH.minDurability) {
++     M.emit('mm:generator:request', { words });
++   }
+
     if (dur < THRESH.minDurability) {
       M.emit('mm:phase', { phase: 'P7' });
     } else {
