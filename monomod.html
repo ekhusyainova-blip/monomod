@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>𝕄_full Organism · MONOMOD v10.3</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/header.css">
+<link rel="stylesheet" href="css/canvas.css">
+<link rel="stylesheet" href="css/panels.css">
+<link rel="stylesheet" href="css/overlays.css">
+<link rel="stylesheet" href="css/mfull.css">
+</head>
+<body>
+
+<div id="app">
+
+  <div id="header">
+    <span class="core">M#rqlmhwgt</span>
+    <span class="k" id="h-nodes">68</span>
+    <span class="k" id="h-edges">194</span>
+    <span class="d">Λ·Γ·Α</span>
+    <span class="beat" id="beat">· 3 ·</span>
+    <span class="mode" id="h-mode">local</span>
+    <span class="git" id="h-git" onclick="toggleOverlay('git')">GIT: idle</span>
+    <span class="state" id="tick-label">t=0</span>
+    <span class="menu">
+      <button id="btn-home" onclick="toggleOverlay('home')">HOME</button>
+      <button id="btn-mode" onclick="toggleOverlay('mode')">MODE</button>
+      <button id="btn-graph" onclick="toggleOverlay('graph')">ГРАФ</button>
+    </span>
+  </div>
+
+  <div id="canvas-wrap">
+    <canvas id="canvas"></canvas>
+    <div id="output"></div>
+    <div id="journal"></div>
+
+    <div class="overlay" id="ov-home">
+      <h2>· HOME · сводная</h2>
+      <div class="pn"><h3>· Режим</h3>
+        <div class="r"><span class="k">текущий</span><span id="hm-mode">local</span></div>
+        <div class="r"><span class="k">origin</span><span id="hm-origin">—</span></div>
+        <div style="margin-top:6px">
+          <button class="act" data-mode="local">local</button>
+          <button class="act" data-mode="hybrid">hybrid</button>
+          <button class="act" data-mode="remote">remote</button>
+        </div>
+      </div>
+      <div class="pn"><h3>· План на день</h3><div id="hm-plan"></div></div>
+      <div class="pn"><h3>· Git</h3>
+        <div class="r"><span class="k">repo</span><span id="hm-repo">—/—</span></div>
+        <div class="r"><span class="k">status</span><span id="hm-git">idle</span></div>
+        <div class="r"><span class="k">ops</span><span id="hm-ops">0</span></div>
+        <button class="act primary" onclick="toggleOverlay('git')">→ GIT</button>
+      </div>
+      <div class="pn"><h3>· Гид</h3>
+        <div class="r"><span class="k">цель</span><span id="hm-target">core</span></div>
+        <div class="r"><span class="k">шаг</span><span id="hm-step">0</span></div>
+        <div class="r"><span class="k">Γ</span><span id="hm-gamma">—</span></div>
+        <button class="act" onclick="gidStep()">шаг</button>
+      </div>
+      <div class="pn"><h3>· Λ · состояния</h3>
+        <div class="r"><span class="k">устойчивость</span><span id="hm-lambda">—</span></div>
+        <div class="r"><span class="k">плотность</span><span id="hm-v1">—</span></div>
+        <div class="r"><span class="k">связность</span><span id="hm-v2">—</span></div>
+        <div class="r"><span class="k">ритм</span><span id="hm-v3">—</span></div>
+        <div class="r"><span class="k">глубина</span><span id="hm-v4">—</span></div>
+        <div class="r"><span class="k">новизна</span><span id="hm-v5">—</span></div>
+      </div>
+      <div class="pn"><h3>· Связи</h3>
+        <div class="r"><span class="k">узлов</span><span id="hm-nodes">68</span></div>
+        <div class="r"><span class="k">связей</span><span id="hm-edges">194</span></div>
+        <div class="r"><span class="k">мост</span><span id="hm-bridge">0</span></div>
+        <div class="r"><span class="k">замков</span><span id="hm-locks">0</span></div>
+      </div>
+      <button class="act" onclick="toggleOverlay('home')">закрыть</button>
+    </div>
+
+    <div class="overlay" id="ov-mode">
+      <h2>· MODE · локальный режим</h2>
+      <div class="pn"><h3>· Текущий</h3>
+        <div class="r"><span class="k">mode</span><span id="md-cur">local</span></div>
+        <div class="r"><span class="k">origin</span><span id="md-origin">—</span></div>
+        <div class="r"><span class="k">path</span><span id="md-path">—</span></div>
+        <div class="r"><span class="k">localStorage</span><span class="ok" id="md-ls">есть</span></div>
+      </div>
+      <div class="pn"><h3>· Что значит</h3>
+        <div class="r"><span class="k">local</span><span>всё в localStorage</span></div>
+        <div class="r"><span class="k">hybrid</span><span>local + pull по кнопке</span></div>
+        <div class="r"><span class="k">remote</span><span>pull при старте</span></div>
+      </div>
+      <div class="pn"><h3>· localStorage</h3>
+        <div class="r"><span class="k">monomod.mode</span><span id="md-k1">—</span></div>
+        <div class="r"><span class="k">monomod.github</span><span id="md-k2">—</span></div>
+        <button class="act danger" onclick="localStorage.clear();location.reload()">очистить всё</button>
+        <button class="act" onclick="location.reload()">перезагрузить</button>
+      </div>
+      <button class="act" onclick="toggleOverlay('mode')">закрыть</button>
+    </div>
+
+    <div class="overlay" id="ov-git">
+      <h2>· GIT · сборка и релиз</h2>
+      <div class="pn"><h3>· Режим</h3>
+        <div class="r"><span class="k">текущий</span><span id="gt-mode">local</span></div>
+        <button class="act" data-gmode="local">local</button>
+        <button class="act" data-gmode="hybrid">hybrid</button>
+        <button class="act" data-gmode="remote">remote</button>
+      </div>
+      <div class="pn"><h3>· Соединение</h3>
+        <div class="r"><span class="k">owner</span><input id="gt-o" placeholder="логин"></div>
+        <div class="r"><span class="k">repo</span><input id="gt-r" placeholder="monomod"></div>
+        <div class="r"><span class="k">path</span><input id="gt-p" value="index.html"></div>
+        <div class="r"><span class="k">branch</span><input id="gt-b" value="main"></div>
+        <div class="r"><span class="k">token</span><input id="gt-t" type="password" placeholder="ghp_..."></div>
+        <div style="margin-top:8px">
+          <button class="act" id="gt-save">сохранить</button>
+          <button class="act" id="gt-ping">проверить</button>
+          <span id="gt-ping-out" style="color:#44445a;font-size:9px;margin-left:6px"></span>
+        </div>
+      </div>
+      <div class="pn"><h3>· Сборка / релиз</h3>
+        <div class="r"><span class="k">message</span><input id="gt-m" value="MONOMOD update"></div>
+        <div class="prog"><span id="gt-prog"></span></div>
+        <div style="margin-top:8px">
+          <button class="act" id="gt-pull">⬇ pull</button>
+          <button class="act" id="gt-push">⬆ push</button>
+          <button class="act primary" id="gt-ship">▶ ship</button>
+        </div>
+        <div id="gt-out" style="color:#44445a;font-size:9px;margin-top:8px;white-space:pre-wrap"></div>
+      </div>
+      <div class="pn"><h3>· Render hook</h3>
+        <div class="r"><span class="k">hook URL</span><input id="gt-h" placeholder="https://api.render.com/deploy/..."></div>
+        <button class="act" id="gt-h-save">сохранить</button>
+        <button class="act" id="gt-deploy">deploy</button>
+      </div>
+      <div class="pn"><h3>· Статус</h3>
+        <div class="r"><span class="k">lastStatus</span><span id="gt-st">idle</span></div>
+        <div class="r"><span class="k">lastAt</span><span id="gt-at">—</span></div>
+        <div class="r"><span class="k">ops</span><span id="gt-ops">0</span></div>
+      </div>
+      <div class="pn"><h3>· Лог</h3><div id="gt-log"></div></div>
+      <button class="act" onclick="toggleOverlay('git')">закрыть</button>
+    </div>
+
+    <div class="overlay" id="ov-graph">
+      <h2>· ГРАФ · 68 узлов · 194 связи</h2>
+      <div id="tabs"></div>
+      <div id="graph-view" style="padding:10px"></div>
+      <button class="act" onclick="toggleOverlay('graph')">закрыть</button>
+    </div>
+
+    <div class="overlay" id="ov-mfull">
+      <h2>· 𝕄_full · маршруты · корректор · лечение</h2>
+      <div id="mfull-view" style="padding:10px"></div>
+      <button class="act" onclick="toggleOverlay('mfull')">закрыть</button>
+    </div>
+
+  </div>
+
+  <div id="state-panel">
+    <div class="var-box">
+      <div class="var-name">v1 · плотность</div>
+      <div class="var-value" id="v1-val">0.00</div>
+      <div class="var-bar"><div class="var-bar-fill" id="v1-bar" style="background:#4dd0c7"></div></div>
+    </div>
+    <div class="var-box">
+      <div class="var-name">v2 · связность</div>
+      <div class="var-value" id="v2-val">0.00</div>
+      <div class="var-bar"><div class="var-bar-fill" id="v2-bar" style="background:#8b5cf6"></div></div>
+    </div>
+    <div class="var-box">
+      <div class="var-name">v3 · ритм</div>
+      <div class="var-value" id="v3-val">0.00</div>
+      <div class="var-bar"><div class="var-bar-fill" id="v3-bar" style="background:#e8c39e"></div></div>
+    </div>
+    <div class="var-box">
+      <div class="var-name">v4 · глубина</div>
+      <div class="var-value" id="v4-val">0.00</div>
+      <div class="var-bar"><div class="var-bar-fill" id="v4-bar" style="background:#ffb347"></div></div>
+    </div>
+    <div class="var-box">
+      <div class="var-name">v5 · новизна</div>
+      <div class="var-value" id="v5-val">0.00</div>
+      <div class="var-bar"><div class="var-bar-fill" id="v5-bar" style="background:#2ed573"></div></div>
+    </div>
+  </div>
+
+  <div id="footer">
+    <span id="status">дышит · сама</span>
+    <div class="btns">
+      <button id="btn-fold">свёртка</button>
+      <button id="btn-unfold">разворот</button>
+      <button id="btn-journal">дневник</button>
+      <button id="btn-mfull">𝕄_full</button>
+    </div>
+  </div>
+
+</div>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>
