@@ -139,14 +139,18 @@
   M.modules.generator = GEN;
 
   // ─── реакция на завершение конвейера ─────────────
-  M.on('mm:conveyer:result', (e) => {
-    const d = e.detail || {};
-    if (!d.words || !d.words.length) return;
-    // генерируем только на удачном маршруте
-    if (d.durability >= 0.15) {
-      GEN.generate(d.words.join(' '));
-    }
-  });
+  - M.on('mm:conveyer:result', (e) => {
+-   const d = e.detail || {};
+-   if (!d.words || !d.words.length) return;
+-   if (d.durability >= 0.15) {
+-     GEN.generate(d.words.join(' '));
+-   }
+- });
++ M.on('mm:generator:request', (e) => {
++   const d = e.detail || {};
++   if (!d.words || !d.words.length) return;
++   GEN.generate(d.words.join(' '));
++ });
 
   console.log('[lambda] generator ready');
 })(window.MONOMODE);
