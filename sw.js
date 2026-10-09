@@ -7,8 +7,11 @@ const ASSETS = [
   './core/bus.js', './core/monomode.js', './core/conveyer.js',
   './modules/psi/state.js', './modules/psi/spiral.js',
   './modules/lambda/viz.js',
++ './modules/lambda/generator.js',
++ './modules/lambda/klepa.js',
   './modules/omega/pack.js', './modules/omega/canon.js',
   './renderers/sphere.js', './renderers/input.js',
++ './renderers/output.js',
   './styles/monomod.css', './styles/index.css',
 ];
 
