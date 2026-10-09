@@ -47,6 +47,32 @@
       return JSON.stringify(this.take()).length;
     },
   };
+  
+  M.on('mm:ready', () => {
+  // авто-снимок при закрытии страницы
+  window.addEventListener('beforeunload', () => {
+    const s = S.take();
+    localStorage.setItem('mm_snapshot_last', JSON.stringify(s));
+  });
+
+  // авто-снимок при рождении шаблона
+  M.on('mm:archive:created', () => {
+    const s = S.take();
+    localStorage.setItem('mm_snapshot_last', JSON.stringify(s));
+  });
+
+  // авто-восстановление при загрузке (если есть)
+  const saved = localStorage.getItem('mm_snapshot_last');
+  if (saved) {
+    try {
+      const snap = JSON.parse(saved);
+      if (snap.graph?.data) {
+        S.apply(snap);
+        console.log('[core] snapshot restored:', snap.id);
+      }
+    } catch (_) {}
+  }
+});
 
   M.snapshot = S;
   M.modules.snapshot = S;
