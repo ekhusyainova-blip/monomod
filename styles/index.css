@@ -1,4 +1,0 @@
-/* стили index.html — то же, что monomod.css, но без #header и #status */
-@import url('./monomod.css');
-
-#header, #status { display: none; }
