@@ -5,6 +5,7 @@
   "core/bus.js",
   "core/monomode.js",
   "core/conveyer.js",
+  "core/snapshot.js",
   "modules/psi/state.js",
   "modules/psi/spiral.js",
   "modules/lambda/viz.js",
