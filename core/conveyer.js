@@ -75,6 +75,8 @@
       M.emit('mm:phase', { phase: 'P7' });
     } else {
       M.emit('mm:phase', { phase: 'P10' });
+      // §gen · запрос генератору
+      M.emit('mm:generator:request', { words });
     }
 
     return { words, durability: dur };
