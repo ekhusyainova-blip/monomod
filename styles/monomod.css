@@ -116,3 +116,50 @@ input {
 #output.golden .gen-word {
   color: var(--gold);
 }
+
+/* ─── Клепа · пиксельный фон ─── */
+#klepa {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;
+  pointer-events: none;
+  image-rendering: pixelated;
+  opacity: 0.55;
+}
+
+/* ─── панель стратегий ─── */
+#strategy-switch {
+  position: absolute;
+  right: 16px;
+  bottom: 24px;
+  display: flex;
+  gap: 4px;
+  z-index: 5;
+  opacity: 0.35;
+  transition: opacity 0.4s;
+}
+#strategy-switch:hover { opacity: 1; }
+#strategy-switch button {
+  background: #0e0e14;
+  border: 1px solid #1c1c26;
+  color: #55556a;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.3s;
+}
+#strategy-switch button:hover {
+  border-color: #4dd0c7;
+  color: #4dd0c7;
+}
+#strategy-switch button.on {
+  border-color: #4dd0c7;
+  color: #4dd0c7;
+  background: rgba(77, 208, 199, 0.08);
+}
