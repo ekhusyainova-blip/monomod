@@ -1,0 +1,1467 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MONOMOD · минимальная сборка</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    background: #05050a; color: #e8e8f0; font-size: 13px;
+    overscroll-behavior: none;
+  }
+  #app {
+    display: grid;
+    grid-template-columns: 1fr 420px;
+    grid-template-rows: 42px 1fr auto;
+    height: 100vh;
+  }
+  #hud {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 14px;
+    background: #0a0a12;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 11px; color: #8888a0;
+    overflow-x: auto; white-space: nowrap;
+    scrollbar-width: none;
+  }
+  #hud::-webkit-scrollbar { display: none; }
+  #hud b { color: #e8e8f0; font-weight: normal; }
+  #hud .hot { color: #ff6a9a; }
+  #hud .ok { color: #4aff9a; }
+  #hud .warn { color: #ffb84a; }
+  #hud .cool { color: #7aa2ff; }
+  #hud .id-badge {
+    padding: 2px 8px; border-radius: 3px;
+    border: 1px solid rgba(143,216,255,0.4);
+    color: #8fd8ff; font-variant-numeric: tabular-nums;
+    cursor: pointer;
+  }
+  #hud .id-badge:hover { background: rgba(143,216,255,0.08); }
+  #hud .spacer { margin-left: auto; }
+  #hud button {
+    background: transparent; color: #8888a0;
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 4px 8px; border-radius: 3px;
+    font: inherit; font-size: 10.5px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  #hud button:hover { color: #e8e8f0; border-color: rgba(255,255,255,0.25); }
+  #hud button.on { color: #4aff9a; border-color: #4aff9a; }
+
+  #stage {
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 45%, #0b0b16, #03030a 75%);
+  }
+  canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+  .corner { position: absolute; font-size: 9.5px; color: #5c5c70; letter-spacing: 0.1em; pointer-events: none; }
+  .tl { top: 10px; left: 12px; }
+  .tr { top: 10px; right: 12px; text-align: right; }
+  .bl { bottom: 10px; left: 12px; }
+  .br { bottom: 10px; right: 12px; text-align: right; }
+  .corner b { color: #e8e8f0; font-weight: normal; }
+  .corner .ok { color: #4aff9a; }
+  .corner .hot { color: #ff6a9a; }
+
+  #legend {
+    position: absolute;
+    top: 40px; left: 12px;
+    font-size: 9.5px; color: #5c5c70;
+    line-height: 1.9;
+    background: rgba(10,10,18,0.82);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 4px;
+    padding: 9px 12px;
+    pointer-events: none;
+    max-width: 240px;
+  }
+  #legend .row { display: flex; align-items: flex-start; gap: 7px; }
+  #legend .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  #legend .txt { font-size: 9.5px; line-height: 1.4; }
+  #legend .txt b { color: #b8b8c8; font-weight: normal; }
+  #legend .txt small { color: #4a4a5a; display: block; font-size: 8.5px; }
+
+  #neuron-card {
+    position: absolute;
+    background: rgba(10,10,18,0.96);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 5px;
+    padding: 10px 12px;
+    font-size: 10.5px;
+    color: #b8b8c8;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    max-width: 300px;
+    line-height: 1.5;
+    backdrop-filter: blur(6px);
+    z-index: 10;
+  }
+  #neuron-card.show { opacity: 1; }
+  #neuron-card.pinned {
+    pointer-events: auto;
+    border-color: rgba(255,106,154,0.5);
+    box-shadow: 0 0 20px rgba(255,106,154,0.15);
+  }
+  #neuron-card h4 {
+    font-size: 11.5px; font-weight: normal;
+    color: #e8e8f0; margin-bottom: 6px;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  }
+  #neuron-card h4 .l { color: #ff6a9a; font-weight: bold; font-size: 13px; }
+  #neuron-card h4 .dim {
+    font-size: 9px; padding: 2px 5px;
+    border-radius: 3px; border: 1px solid;
+  }
+  #neuron-card h4 .dim.d1 { color: #4ac9ff; border-color: rgba(74,201,255,0.5); }
+  #neuron-card h4 .dim.d2 { color: #4aff9a; border-color: rgba(74,255,154,0.5); }
+  #neuron-card h4 .dim.d3 { color: #ffb84a; border-color: rgba(255,184,74,0.5); }
+  #neuron-card h4 .dim.d4 { color: #ff6a9a; border-color: rgba(255,106,154,0.5); }
+  #neuron-card h4 .dim.d5 { color: #c8a4ff; border-color: rgba(200,164,255,0.5); }
+  #neuron-card .agent-badge {
+    display: inline-block; font-size: 9px;
+    padding: 1px 5px; border-radius: 2px;
+    background: rgba(143,216,184,0.12);
+    color: #8fd8b8; margin-top: 4px;
+  }
+  #neuron-card .agent-badge.klp {
+    background: rgba(255,106,154,0.12);
+    color: #ff6a9a;
+  }
+  #neuron-card .pos { color: #6b6b80; font-size: 10px; margin-bottom: 4px; }
+  #neuron-card .axis-grid {
+    display: grid;
+    grid-template-columns: 70px 1fr 40px;
+    gap: 3px 6px;
+    font-size: 10px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dotted rgba(255,255,255,0.08);
+  }
+  #neuron-card .axis-grid .name { color: #6b6b80; }
+  #neuron-card .axis-grid .bar {
+    height: 4px; background: rgba(255,255,255,0.06);
+    border-radius: 2px; overflow: hidden; align-self: center;
+  }
+  #neuron-card .axis-grid .bar span { display: block; height: 100%; border-radius: 2px; }
+  #neuron-card .axis-grid .v {
+    font-variant-numeric: tabular-nums;
+    color: #e8e8f0; font-size: 9.5px; text-align: right;
+  }
+  #neuron-card .pin-hint {
+    font-size: 9px; color: #6b6b80;
+    margin-top: 6px; padding-top: 4px;
+    border-top: 1px dotted rgba(255,255,255,0.08);
+    text-align: right;
+  }
+
+  #side {
+    background: #0a0a12;
+    border-left: 1px solid rgba(255,255,255,0.06);
+    display: flex; flex-direction: column;
+    overflow-y: auto; overflow-x: hidden;
+  }
+  .panel {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+  }
+  .panel h3 {
+    font-size: 9.5px; font-weight: normal;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #6b6b80;
+    margin-bottom: 8px;
+    cursor: pointer; user-select: none;
+  }
+  .panel h3::after { content: " ▾"; opacity: 0.4; font-size: 8px; }
+  .panel.collapsed h3::after { content: " ▸"; }
+  .panel.collapsed > *:not(h3) { display: none; }
+
+  #triad-row { display: flex; gap: 6px; margin-bottom: 6px; }
+  #triad-row > div {
+    flex: 1; text-align: center;
+    padding: 6px 4px;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px;
+    font-size: 10px; color: #8888a0;
+  }
+  #triad-row .v {
+    display: block; font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    margin-top: 2px; color: #e8e8f0;
+  }
+  #triad-row .omega { color: #7aa2ff; border-color: rgba(122,162,255,0.3); }
+  #triad-row .psi { color: #e8c39e; border-color: rgba(232,195,158,0.3); }
+  #triad-row .lambda { color: #ffa840; border-color: rgba(255,168,64,0.3); }
+  #dev-bar {
+    height: 4px; background: rgba(255,255,255,0.06);
+    border-radius: 2px; overflow: hidden; margin-top: 4px;
+  }
+  #dev-bar::after {
+    content: ""; display: block; height: 100%;
+    width: var(--dev, 0%);
+    background: linear-gradient(90deg, #4aff9a, #ffb84a, #ff6a9a);
+    transition: width 0.3s;
+  }
+  #dev-label {
+    font-size: 10px; color: #8888a0;
+    margin-top: 4px;
+    display: flex; justify-content: space-between;
+  }
+
+  /* ID-блок */
+  #id-panel {
+    background: rgba(143,216,255,0.03);
+    border-bottom: 1px solid rgba(143,216,255,0.15);
+  }
+  #id-panel h3 { color: #8fd8ff; opacity: 0.9; }
+  #id-short {
+    font-size: 10.5px;
+    color: #8fd8ff;
+    background: rgba(0,0,0,0.3);
+    padding: 6px 8px;
+    border-radius: 4px;
+    border-left: 2px solid #8fd8ff;
+    cursor: pointer;
+    word-break: break-all;
+    line-height: 1.5;
+    transition: background 0.15s;
+  }
+  #id-short:hover { background: rgba(143,216,255,0.1); }
+  #id-detail {
+    font-size: 10px;
+    color: #6b6b80;
+    margin-top: 6px;
+    line-height: 1.6;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  #id-detail .row { display: flex; justify-content: space-between; }
+  #id-detail .row b { color: #e8e8f0; font-weight: normal; font-variant-numeric: tabular-nums; }
+
+  #cycle-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 6px;
+  }
+  #cycle-row .phase {
+    text-align: center;
+    padding: 4px 2px;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 3px;
+    font-size: 8.5px;
+    color: #4a4a5a;
+    transition: all 0.2s;
+  }
+  #cycle-row .phase.active {
+    color: #ff6a9a;
+    border-color: rgba(255,106,154,0.6);
+    background: rgba(255,106,154,0.08);
+  }
+  #cycle-row .phase.done {
+    color: #4aff9a;
+    border-color: rgba(74,255,154,0.3);
+  }
+  #cycle-status {
+    font-size: 10px; color: #6b6b80;
+    line-height: 1.5;
+  }
+
+  #syn-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px 8px;
+    font-size: 10.5px;
+    color: #8888a0;
+  }
+  #syn-stats span:nth-child(even) {
+    text-align: right; color: #e8e8f0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #log-panel {
+    flex: 1;
+    display: flex; flex-direction: column;
+    min-height: 140px;
+    overflow: hidden;
+    padding: 10px 12px;
+  }
+  #log-panel h3 { flex-shrink: 0; }
+  #log {
+    flex: 1; overflow-y: auto;
+    font-size: 10.5px; line-height: 1.55;
+    padding-right: 4px;
+  }
+  #log .l {
+    padding: 2px 0;
+    border-bottom: 1px dotted rgba(255,255,255,0.04);
+    word-break: break-word;
+  }
+  #log .l b { color: #8fb8d8; font-weight: normal; }
+  #log .l.hot { color: #ff6a9a; }
+  #log .l.cool { color: #7aa2ff; }
+  #log .l.ok { color: #4aff9a; }
+  #log .l.warn { color: #ffb84a; }
+
+  #input-row {
+    grid-column: 1 / -1;
+    padding: 10px 14px;
+    background: #0a0a12;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex; gap: 8px; align-items: center;
+  }
+  #q {
+    flex: 1;
+    background: transparent;
+    border: none; outline: none;
+    color: #e8e8f0; font: inherit; font-size: 14px;
+    padding: 6px 0;
+  }
+  #q::placeholder { color: rgba(255,255,255,0.2); }
+  #send {
+    background: transparent; color: #8888a0;
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 6px 12px; border-radius: 3px;
+    font: inherit; font-size: 12px;
+    cursor: pointer;
+  }
+  #send:hover { color: #e8e8f0; border-color: rgba(255,255,255,0.3); }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.15);
+    border-radius: 3px;
+  }
+
+  @media (max-width: 820px) {
+    #app { grid-template-columns: 1fr; grid-template-rows: 40px 1fr auto auto; }
+    #side { border-left: none; border-top: 1px solid rgba(255,255,255,0.06); max-height: 45vh; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <div id="hud">
+    <span>MONOMOD · <b id="h-version">v1</b></span>
+    <span>синапсов · <b id="h-synapses" class="cool">0</b></span>
+    <span>такт · <b id="h-cycle">collect</b></span>
+    <span id="h-id-badge" class="id-badge">hash · ———</span>
+    <span class="spacer"></span>
+    <button id="btn-sound">♪</button>
+    <button id="btn-pause">⏸</button>
+  </div>
+
+  <div id="stage">
+    <canvas id="canvas"></canvas>
+
+    <div class="corner tl">◈ 26 нейронов · 12 осей · 3 потока + Γ</div>
+    <div class="corner tr" id="ov-tr">—</div>
+    <div class="corner bl" id="ov-bl">устойчиво</div>
+    <div class="corner br" id="ov-br">t = 0.0 с</div>
+
+    <div id="legend">
+      <div class="row"><span class="dot" style="background:#e8c39e"></span><div class="txt"><b>Ψ (Я)</b><small>P1 · генерация</small></div></div>
+      <div class="row"><span class="dot" style="background:#7aa2ff"></span><div class="txt"><b>Ω (ОНИ)</b><small>P3/P6 · проверка</small></div></div>
+      <div class="row"><span class="dot" style="background:#ffa840"></span><div class="txt"><b>Λ (ТЫ)</b><small>P7/P9 · разрыв</small></div></div>
+      <div class="row"><span class="dot" style="background:#8fd8b8"></span><div class="txt"><b>Γ (Клепа)</b><small>P4/P8 · перераспределяет</small></div></div>
+    </div>
+
+    <div id="neuron-card"></div>
+  </div>
+
+  <div id="side">
+
+    <div class="panel" id="p-triad">
+      <h3>триада 1:1:1 · V = −k·δ</h3>
+      <div id="triad-row">
+        <div class="psi">Я (Ψ)<span class="v" id="v-psi">0.33</span></div>
+        <div class="omega">ОНИ (Ω)<span class="v" id="v-omega">0.33</span></div>
+        <div class="lambda">ТЫ (Λ)<span class="v" id="v-lambda">0.34</span></div>
+      </div>
+      <div id="dev-bar"></div>
+      <div id="dev-label">
+        <span>δ = <b id="v-dev">0.000</b></span>
+        <span id="v-dev-state">Γ держит</span>
+      </div>
+    </div>
+
+    <div class="panel" id="id-panel">
+      <h3>идентификатор · нажми чтобы копировать</h3>
+      <div id="id-short">[MONOMOD·————————·1:1:1=33.3:33.3:33.4]</div>
+      <div id="id-detail">
+        <div class="row"><span>хэш</span><b id="id-hash">———</b></div>
+        <div class="row"><span>1:1:1</span><b id="id-ratio">33.3:33.3:33.4</b></div>
+        <div class="row"><span>доминанта</span><b id="id-dom">Я</b></div>
+        <div class="row"><span>|V|</span><b id="id-vmag">0.000</b></div>
+        <div class="row"><span>цикл</span><b id="id-cycle">0</b></div>
+      </div>
+    </div>
+
+    <div class="panel" id="p-cycle">
+      <h3>7-тактный цикл</h3>
+      <div id="cycle-row">
+        <div class="phase" data-phase="0">метка</div>
+        <div class="phase" data-phase="1">collect</div>
+        <div class="phase" data-phase="2">link</div>
+        <div class="phase" data-phase="3">P1..P4</div>
+        <div class="phase" data-phase="4">pack</div>
+        <div class="phase" data-phase="5">unpack</div>
+        <div class="phase" data-phase="6">apply</div>
+      </div>
+      <div id="cycle-status">такт <b>0</b> из 7 · сбор сигнала</div>
+    </div>
+
+    <div class="panel" id="p-syn">
+      <h3>синапсы</h3>
+      <div id="syn-stats">
+        <span>всего</span><span id="s-total">0</span>
+        <span>сильных</span><span id="s-strong">0</span>
+        <span>слабых</span><span id="s-weak">0</span>
+        <span>погасших</span><span id="s-dead">0</span>
+        <span>перестроек</span><span id="s-rewires">0</span>
+        <span>LINK-опер.</span><span id="s-links">0</span>
+      </div>
+    </div>
+
+    <div class="panel" id="log-panel" style="flex:1;">
+      <h3>события</h3>
+      <div id="log"></div>
+    </div>
+
+  </div>
+
+  <div id="input-row">
+    <input id="q" placeholder="слово — сдвинет оси ближайшего к Ψ нейрона..." autocomplete="off">
+    <button id="send">→</button>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+
+/* ═══════════════════════════════════════════════
+   12 ОСЕЙ
+   ═══════════════════════════════════════════════ */
+const AXES = [
+  { id: 'val', name: 'валент' },
+  { id: 'age', name: 'агент' },
+  { id: 'cer', name: 'увер' },
+  { id: 'rel', name: 'связь' },
+  { id: 'tim', name: 'время' },
+  { id: 'dep', name: 'глубина' },
+  { id: 'bri', name: 'яркость' },
+  { id: 'wgt', name: 'вес' },
+  { id: 'mot', name: 'движение' },
+  { id: 'bnd', name: 'граница' },
+  { id: 'mod', name: 'модаль' },
+  { id: 'att', name: 'внимание' },
+];
+
+/* ═══════════════════════════════════════════════
+   5 МЕРНОСТЕЙ
+   ═══════════════════════════════════════════════ */
+const DIMS = {
+  1: { name: '1D', color: '#4ac9ff', letters: ['A','K','N','Y'] },
+  2: { name: '2D', color: '#4aff9a', letters: ['C','E','L','T','U','V'] },
+  3: { name: '3D', color: '#ffb84a', letters: ['J','M','O','S'] },
+  4: { name: '4D', color: '#ff6a9a', letters: ['I','P','Q','W','X'] },
+  5: { name: '5D', color: '#c8a4ff', letters: ['B','D','F','G','H','R','Z'] },
+};
+
+const LETTER_DIM = {};
+Object.entries(DIMS).forEach(([dim, d]) => {
+  d.letters.forEach(L => { LETTER_DIM[L] = +dim; });
+});
+
+/* ═══════════════════════════════════════════════
+   7 АГЕНТОВ
+   ═══════════════════════════════════════════════ */
+const AGENTS = [
+  { id: 'KLP-001', letters: ['Y','A','Z'], role: 'якорь' },
+  { id: 'AG-001',  letters: ['C'],         role: 'связь' },
+  { id: 'AG-002',  letters: ['D'],         role: 'проверка' },
+  { id: 'AG-003',  letters: ['I'],         role: 'адаптация' },
+  { id: 'AG-004',  letters: ['S'],         role: 'синтез' },
+  { id: 'AG-005',  letters: ['P'],         role: 'траектория' },
+  { id: 'AG-006',  letters: ['Z'],         role: 'интеграция' },
+];
+
+const LETTER_AGENT = {};
+AGENTS.forEach(a => {
+  a.letters.forEach(L => { LETTER_AGENT[L] = a; });
+});
+
+/* ═══════════════════════════════════════════════
+   26 НЕЙРОНОВ
+   ═══════════════════════════════════════════════ */
+const NEURON_NAMES = [
+  'свет','глубина','связь','декодер','край','пустота','вес','инерция',
+  'след','junction','кипение','липкость','двойник','ноль','обертон','путь',
+  'вопрос','резонанс','система','тепло','усталость','влага','волна','хрупкость',
+  'якорь','зенит'
+];
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const BLIND_ZONES = ['F', 'N', 'V'];
+const Y_MAX = 351;
+
+const NEURONS = LETTERS.map((l, i) => {
+  const xIdx = i + 1;
+  const yTri = xIdx * (xIdx + 1) / 2;
+  return {
+    l,
+    name: NEURON_NAMES[i],
+    x: 0.05 + (xIdx / 26) * 0.9,
+    y: 0.05 + (yTri / Y_MAX) * 0.9,
+    isBlind: BLIND_ZONES.includes(l),
+  };
+});
+
+const N = NEURONS.length;
+const N_IDX = {};
+NEURONS.forEach((n, i) => { N_IDX[n.l] = i; });
+
+const DEFAULT_AXES = {
+  A: [ 0, +1,  0,  0,  0,  0,  0,  0,  0,  0,  0, +1],
+  B: [ 0,  0, +1,  0,  0, +1,  0,  0,  0,  0,  0,  0],
+  C: [ 0,  0,  0, +1,  0,  0,  0,  0,  0,  0, +1,  0],
+  D: [ 0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0, +1],
+  E: [ 0,  0,  0,  0,  0,  0,  0,  0,  0, +1,  0,  0],
+  F: [-1,  0,  0,  0,  0,  0,  0,  0,  0, +1,  0,  0],
+  G: [ 0,  0,  0,  0,  0,  0,  0, +1, -1,  0,  0,  0],
+  H: [ 0,  0,  0,  0,  0,  0,  0, +1, -1,  0,  0,  0],
+  I: [ 0,  0,  0,  0, -1,  0,  0,  0,  0,  0,  0,  0],
+  J: [ 0,  0,  0, +1,  0,  0,  0,  0,  0, +1,  0,  0],
+  K: [ 0, +1,  0,  0,  0,  0,  0,  0, +1,  0,  0,  0],
+  L: [ 0,  0,  0, +1,  0,  0,  0,  0, -1,  0,  0,  0],
+  M: [ 0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0, +1],
+  N: [ 0,  0,  0,  0,  0,  0,  0,  0, -1,  0,  0, -1],
+  O: [ 0,  0,  0,  0,  0,  0, +1,  0,  0,  0,  0, +1],
+  P: [ 0,  0,  0,  0, +1,  0,  0,  0, +1,  0,  0,  0],
+  Q: [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0, +1, +1],
+  R: [ 0,  0,  0, +1,  0,  0,  0,  0,  0,  0,  0, +1],
+  S: [ 0,  0, +1,  0,  0, +1,  0,  0,  0,  0,  0,  0],
+  T: [+1,  0,  0, +1,  0,  0,  0,  0,  0,  0,  0,  0],
+  U: [ 0,  0,  0,  0,  0,  0, -1,  0, -1,  0,  0,  0],
+  V: [ 0,  0,  0,  0,  0,  0,  0,  0, +1, +1,  0,  0],
+  W: [ 0,  0,  0,  0, +1,  0,  0,  0, +1,  0,  0,  0],
+  X: [ 0,  0, -1,  0,  0,  0,  0,  0,  0, +1,  0,  0],
+  Y: [ 0,  0, +1,  0,  0,  0,  0,  0, -1,  0,  0,  0],
+  Z: [ 0,  0, +1,  0,  0, +1,  0,  0,  0,  0,  0,  0],
+};
+
+const NEURON_AXES = JSON.parse(JSON.stringify(DEFAULT_AXES));
+
+const BASE_SYNAPSES = [
+  ['A','B'], ['A','Y'], ['A','Z'], ['B','C'], ['B','G'],
+  ['C','D'], ['C','M'], ['D','E'], ['D','F'], ['E','F'],
+  ['E','X'], ['F','G'], ['G','H'], ['G','Z'], ['H','I'],
+  ['I','J'], ['I','W'], ['J','K'], ['K','L'], ['K','A'],
+  ['L','M'], ['M','N'], ['M','Y'], ['N','O'], ['O','P'],
+  ['P','Q'], ['Q','R'], ['R','S'], ['S','T'], ['T','U'],
+  ['U','V'], ['V','W'], ['W','X'], ['X','Y'], ['Y','Z'],
+];
+
+const CORE_SYNAPSES = [['Y','A'], ['A','Z'], ['Y','Z']];
+
+/* ═══════════════════════════════════════════════
+   СОСТОЯНИЕ
+   ═══════════════════════════════════════════════ */
+let synapses = [];
+
+function initSynapses() {
+  synapses = [];
+  for (let i = 0; i < N; i++) {
+    synapses[i] = [];
+    for (let j = 0; j < N; j++) {
+      synapses[i][j] = { weight: 0, lastUsed: 0, uses: 0 };
+    }
+  }
+  BASE_SYNAPSES.forEach(([a, b]) => {
+    const i = N_IDX[a], j = N_IDX[b];
+    if (i === undefined || j === undefined) return;
+    synapses[i][j].weight = 0.55;
+    synapses[j][i].weight = 0.40;
+  });
+  CORE_SYNAPSES.forEach(([a, b]) => {
+    const i = N_IDX[a], j = N_IDX[b];
+    synapses[i][j].weight = Math.max(synapses[i][j].weight, 0.7);
+    synapses[j][i].weight = Math.max(synapses[j][i].weight, 0.5);
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   ТРИАДА 1:1:1 · V = −k·δ
+   ═══════════════════════════════════════════════ */
+// Порядок: psi (Я), omega (ОНИ), lambda (ТЫ)
+const triad = {
+  psi: 1/3,
+  omega: 1/3,
+  lambda: 1/3,
+  k: 0.5,
+};
+
+function triadStep(dt) {
+  const target = 1/3;
+
+  // дрейф от разницы скоростей потоков
+  const driftPsi    = (flows.psi.speed    - 0.05) * 0.15;
+  const driftOmega  = (flows.omega.speed  - 0.05) * 0.15;
+  const driftLambda = (flows.lambda.speed - 0.05) * 0.15;
+
+  // вектор отклонений
+  const dPsi    = triad.psi    - target;
+  const dOmega  = triad.omega  - target;
+  const dLambda = triad.lambda - target;
+
+  // Γ (Клепа): V = −k · δ
+  triad.psi    += (driftPsi    - triad.k * dPsi)    * dt;
+  triad.omega  += (driftOmega  - triad.k * dOmega)  * dt;
+  triad.lambda += (driftLambda - triad.k * dLambda) * dt;
+
+  // ограничения
+  triad.psi    = Math.max(0.05, Math.min(0.9, triad.psi));
+  triad.omega  = Math.max(0.05, Math.min(0.9, triad.omega));
+  triad.lambda = Math.max(0.05, Math.min(0.9, triad.lambda));
+
+  // нормализация
+  const sum = triad.psi + triad.omega + triad.lambda;
+  triad.psi /= sum; triad.omega /= sum; triad.lambda /= sum;
+}
+
+function triadDeviation() {
+  const t = 1/3;
+  return Math.max(
+    Math.abs(triad.psi - t),
+    Math.abs(triad.omega - t),
+    Math.abs(triad.lambda - t)
+  );
+}
+
+function triadCorrection() {
+  const target = 1/3;
+  const dPsi    = triad.psi    - target;
+  const dOmega  = triad.omega  - target;
+  const dLambda = triad.lambda - target;
+  return {
+    psi:    -triad.k * dPsi,
+    omega:  -triad.k * dOmega,
+    lambda: -triad.k * dLambda,
+    magnitude: Math.sqrt(dPsi*dPsi + dOmega*dOmega + dLambda*dLambda),
+  };
+}
+
+/* ═══════════════════════════════════════════════
+   ПОТОКИ · 4 роли, управляемые 7-тактным циклом
+   ═══════════════════════════════════════════════ */
+const flows = {
+  psi:    { id:'psi',    pos: 0,  speed: 0.050, color:'#e8c39e' },
+  omega:  { id:'omega',  pos: 8,  speed: 0.040, color:'#7aa2ff' },
+  lambda: { id:'lambda', pos: 16, speed: 0.050, color:'#ffa840' },
+  gamma:  { id:'gamma',  pos: 22, speed: 0.040, color:'#8fd8b8' },
+};
+
+let cyclePhase = 0;
+let cycleTick = 0;
+let tickLen = 60;   // тиков на такт
+
+const CYCLE_PHASES = [
+  { name: 'метка',   desc: 'сбор сигнала' },
+  { name: 'collect', desc: 'накопление · Ψ' },
+  { name: 'link',    desc: 'связывание · Ψ+Ω' },
+  { name: 'P1..P4',  desc: 'обработка · все' },
+  { name: 'pack',    desc: 'сжатие · Λ' },
+  { name: 'unpack',  desc: 'разворот · Γ' },
+  { name: 'apply',   desc: 'применение · Γ' },
+];
+
+const PHASE_MULT = [
+  { psi: 1.5, omega: 0.5, lambda: 0.3, gamma: 0.5 },
+  { psi: 1.8, omega: 0.8, lambda: 0.3, gamma: 0.4 },
+  { psi: 1.2, omega: 1.2, lambda: 0.6, gamma: 0.7 },
+  { psi: 1.0, omega: 1.0, lambda: 1.0, gamma: 1.0 },
+  { psi: 0.6, omega: 1.0, lambda: 1.8, gamma: 0.8 },
+  { psi: 0.4, omega: 0.6, lambda: 1.0, gamma: 1.8 },
+  { psi: 0.5, omega: 0.7, lambda: 0.5, gamma: 2.0 },
+];
+
+/* ═══════════════════════════════════════════════
+   УТИЛИТЫ
+   ═══════════════════════════════════════════════ */
+function nearestNeuron(pos) {
+  const i0 = ((Math.floor(pos) % N) + N) % N;
+  const i1 = (i0 + 1) % N;
+  const t = pos - Math.floor(pos);
+  return [{ i: i0, w: 1 - t }, { i: i1, w: t }];
+}
+
+function axisPower(letter) {
+  const axes = NEURON_AXES[letter] || [];
+  let s = 0;
+  for (const v of axes) s += Math.abs(v);
+  return 1 + s * 0.08;
+}
+
+function agentBoost(letter) {
+  const a = LETTER_AGENT[letter];
+  if (!a) return 1.0;
+  return 1.5;
+}
+
+/* ═══════════════════════════════════════════════
+   ШАГ ПОТОКА
+   ═══════════════════════════════════════════════ */
+const flashes = [];
+const stats = { thoughts: 0, words: 0, rewires: 0, laps: 0, links: 0 };
+
+function stepFlow(flow, dt) {
+  const phaseM = PHASE_MULT[cyclePhase][flow.id] || 1.0;
+  const speed = flow.speed * phaseM;
+
+  flow.pos += speed * dt * 60;
+  if (flow.pos >= N) { flow.pos -= N; if (flow.id === 'psi') stats.laps++; }
+  if (flow.pos < 0) flow.pos += N;
+
+  const near = nearestNeuron(flow.pos);
+  near.forEach(({ i, w }) => {
+    if (w < 0.3) return;
+    const neuron = NEURONS[i];
+    const blindMod = neuron.isBlind ? 0.3 : 1.0;
+    const power = axisPower(neuron.l);
+    const boost = agentBoost(neuron.l);
+    const eff = w * blindMod * power * boost * phaseM;
+
+    if (flow.id === 'psi' || flow.id === 'omega') {
+      for (let j = 0; j < N; j++) {
+        if (i === j) continue;
+        const s = synapses[i][j];
+        if (s.weight > 0.05) {
+          const linkBoost = cyclePhase === 2 ? 1.05 : 1.0;
+          s.weight = Math.min(1, s.weight + 0.005 * eff * linkBoost);
+          s.lastUsed = performance.now();
+          s.uses++;
+          if (linkBoost > 1) stats.links++;
+          if (Math.random() < 0.12 * eff && s.weight > 0.2) {
+            flashes.push({ i, j, born: performance.now(), life: 500, color: flow.color });
+          }
+        }
+      }
+      if (flow.id === 'psi' && Math.random() < 0.01 * eff) {
+        const j = Math.floor(Math.random() * N);
+        if (j !== i && synapses[i][j].weight < 0.1) {
+          synapses[i][j].weight = 0.15;
+          stats.rewires++;
+        }
+      }
+    } else if (flow.id === 'lambda') {
+      for (let j = 0; j < N; j++) {
+        if (i === j) continue;
+        const s = synapses[i][j];
+        if (s.weight > 0.05) {
+          s.weight = Math.max(0, s.weight - 0.004 * eff);
+        }
+      }
+    } else if (flow.id === 'gamma') {
+      const local = [];
+      for (let j = 0; j < N; j++) {
+        if (i === j) continue;
+        if (synapses[i][j].weight > 0.05) local.push({ j, s: synapses[i][j] });
+      }
+      if (local.length > 1) {
+        local.sort((a, b) => a.s.weight - b.s.weight);
+        const weakest = local[0];
+        const strongest = local[local.length - 1];
+        const transfer = Math.min(weakest.s.weight, 0.003 * eff);
+        weakest.s.weight = Math.max(0, weakest.s.weight - transfer);
+        strongest.s.weight = Math.min(1, strongest.s.weight + transfer);
+      }
+    }
+  });
+}
+
+function decaySynapses(dt) {
+  const now = performance.now();
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      if (i === j) continue;
+      const s = synapses[i][j];
+      const age = (now - s.lastUsed) / 1000;
+      if (age > 2 && s.weight > 0) {
+        s.weight = Math.max(0, s.weight - 0.0006 * dt);
+      }
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   CANVAS
+   ═══════════════════════════════════════════════ */
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W = 800, H = 600;
+
+function resize() {
+  const r = canvas.getBoundingClientRect();
+  canvas.width = Math.max(1, r.width) * devicePixelRatio;
+  canvas.height = Math.max(1, r.height) * devicePixelRatio;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  W = r.width; H = r.height;
+}
+window.addEventListener('resize', resize);
+
+function neuronPos(idx) {
+  const n = NEURONS[idx];
+  const pad = 50;
+  return {
+    x: pad + n.x * (W - pad * 2),
+    y: pad + n.y * (H - pad * 2),
+  };
+}
+
+function flowPos(flow) {
+  const near = nearestNeuron(flow.pos);
+  const p0 = neuronPos(near[0].i);
+  const p1 = neuronPos(near[1].i);
+  const w = near[1].w;
+  return {
+    x: p0.x * (1 - w) + p1.x * w,
+    y: p0.y * (1 - w) + p1.y * w,
+  };
+}
+
+function render(now) {
+  ctx.fillStyle = 'rgba(3, 3, 10, 0.32)';
+  ctx.fillRect(0, 0, W, H);
+
+  // синапсы
+  for (let i = 0; i < N; i++) {
+    for (let j = i + 1; j < N; j++) {
+      const w = Math.max(synapses[i][j].weight, synapses[j][i].weight);
+      if (w < 0.03) continue;
+      const p1 = neuronPos(i), p2 = neuronPos(j);
+      const alpha = Math.pow(w, 1.4) * 0.6;
+      let r, g, b;
+      if (w > 0.7) { r = 255; g = 106; b = 154; }
+      else if (w > 0.4) { r = 124; g = 92; b = 255; }
+      else { r = 74; g = 132; b = 200; }
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      ctx.lineWidth = 0.4 + w * 2.2;
+      ctx.stroke();
+    }
+  }
+
+  // вспышки
+  for (let k = flashes.length - 1; k >= 0; k--) {
+    const f = flashes[k];
+    const age = now - f.born;
+    if (age > f.life) { flashes.splice(k, 1); continue; }
+    const t = 1 - age / f.life;
+    const p1 = neuronPos(f.i), p2 = neuronPos(f.j);
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.strokeStyle = f.color;
+    ctx.globalAlpha = t * 0.9;
+    ctx.lineWidth = 2 + t * 2;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // нейроны
+  for (let i = 0; i < N; i++) {
+    const p = neuronPos(i);
+    const n = NEURONS[i];
+    let heat = 0;
+    for (let j = 0; j < N; j++) if (i !== j) heat += synapses[i][j].weight;
+    heat = Math.min(1, heat / 8);
+    if (n.isBlind) heat *= 0.4;
+
+    const dim = LETTER_DIM[n.l];
+    const dimColor = DIMS[dim] ? DIMS[dim].color : '#8888a0';
+    const agentHL = false; // убираем подсветку агента в минимальной версии
+
+    const r = 4 + heat * 4;
+    const alpha = 0.5 + heat * 0.5;
+
+    let cr, cg, cb;
+    const dm = dimColor.match(/[0-9a-f]{2}/gi);
+    if (dm) { cr = parseInt(dm[0], 16); cg = parseInt(dm[1], 16); cb = parseInt(dm[2], 16); }
+    else { cr = 100; cg = 140; cb = 200; }
+    cr = Math.min(255, cr + heat * 60);
+    cg = Math.min(255, cg + heat * 30);
+    cb = Math.min(255, cb + heat * 30);
+
+    const isHover = i === hoveredNeuronIdx;
+    const isPinned = i === pinnedNeuronIdx;
+
+    if (isHover || isPinned) {
+      const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 5);
+      const gc = isPinned ? '#ff6a9a' : '#ffffff';
+      glow.addColorStop(0, gc + '55');
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 5, 0, Math.PI * 2);
+      ctx.fillStyle = glow;
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${alpha})`;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r + 2, 0, Math.PI * 2);
+    ctx.strokeStyle = dimColor;
+    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    if (n.isBlind) {
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + 5, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(120,120,140,0.6)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    if (isPinned) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ff6a9a';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    ctx.font = '10px ui-monospace';
+    ctx.fillStyle = heat > 0.4
+      ? `rgba(255,255,255,${0.7 + heat * 0.3})`
+      : `rgba(180,180,200,0.7)`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(n.l, p.x, p.y - r - 10);
+  }
+
+  // потоки
+  for (const key in flows) {
+    const flow = flows[key];
+    const p = flowPos(flow);
+    const pulse = 1 + Math.sin(now * 0.01 + key.length) * 0.15;
+    const mult = PHASE_MULT[cyclePhase][key] || 1.0;
+    const sizeBoost = 1 + (mult - 1) * 0.3;
+
+    const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 26 * sizeBoost);
+    glow.addColorStop(0, flow.color + 'aa');
+    glow.addColorStop(1, flow.color + '00');
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 26 * sizeBoost, 0, Math.PI * 2);
+    ctx.fillStyle = glow;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5 * pulse * sizeBoost, 0, Math.PI * 2);
+    ctx.fillStyle = flow.color;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2 * pulse, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+  }
+
+  requestAnimationFrame(render);
+}
+
+/* ═══════════════════════════════════════════════
+   ИДЕНТИФИКАТОР
+   ═══════════════════════════════════════════════ */
+function hashCore() {
+  const s = [
+    triad.psi.toFixed(3),
+    triad.omega.toFixed(3),
+    triad.lambda.toFixed(3),
+    cyclePhase,
+    stats.thoughts,
+  ].join('|');
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i);
+  return (h >>> 0).toString(36).padStart(8, '0').slice(0, 8);
+}
+
+function dominantTriad() {
+  const m = Math.max(triad.psi, triad.omega, triad.lambda);
+  if (m === triad.psi) return 'Я';
+  if (m === triad.omega) return 'ОНИ';
+  return 'ТЫ';
+}
+
+function makeId() {
+  const hash = hashCore();
+  const total = triad.psi + triad.omega + triad.lambda;
+  const rPsi = triad.psi / total;
+  const rOmega = triad.omega / total;
+  const rLambda = triad.lambda / total;
+  const ratio = `${(rPsi*100).toFixed(1)}:${(rOmega*100).toFixed(1)}:${(rLambda*100).toFixed(1)}`;
+  const corr = triadCorrection();
+  const vec = `V(${corr.psi>=0?'+':''}${corr.psi.toFixed(3)},${corr.omega>=0?'+':''}${corr.omega.toFixed(3)},${corr.lambda>=0?'+':''}${corr.lambda.toFixed(3)})`;
+  return {
+    hash, ratio, vec,
+    dom: dominantTriad(),
+    vmag: corr.magnitude,
+    short: `[MONOMOD·${hash}·1:1:1=${ratio}·${vec}]`,
+    cycle: stats.thoughts,
+  };
+}
+
+let lastId = null;
+function updateId() {
+  const id = makeId();
+  lastId = id;
+  const shortEl = document.getElementById('id-short');
+  if (shortEl) shortEl.textContent = id.short;
+  const set = (idEl, v) => { const e = document.getElementById(idEl); if (e) e.textContent = v; };
+  set('id-hash', id.hash);
+  set('id-ratio', id.ratio);
+  set('id-dom', id.dom);
+  set('id-vmag', id.vmag.toFixed(3));
+  set('id-cycle', id.cycle);
+  const hb = document.getElementById('h-id-badge');
+  if (hb) hb.textContent = `hash · ${id.hash}`;
+  const hh = document.getElementById('id-hash');
+  if (hh) hh.textContent = id.hash;
+}
+
+/* ═══════════════════════════════════════════════
+   HUD
+   ═══════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+function safeSet(id, val) { const el = $(id); if (el) el.textContent = val; }
+
+function updateHUD() {
+  let total = 0, strong = 0, weak = 0, dead = 0;
+  for (let i = 0; i < N; i++) {
+    for (let j = i + 1; j < N; j++) {
+      const w = Math.max(synapses[i][j].weight, synapses[j][i].weight);
+      if (w > 0.03) {
+        total++;
+        if (w > 0.7) strong++;
+        else if (w < 0.3) weak++;
+      } else dead++;
+    }
+  }
+  safeSet('h-synapses', total);
+  safeSet('h-cycle', CYCLE_PHASES[cyclePhase].name);
+
+  safeSet('v-psi', triad.psi.toFixed(2));
+  safeSet('v-omega', triad.omega.toFixed(2));
+  safeSet('v-lambda', triad.lambda.toFixed(2));
+
+  const dev = triadDeviation();
+  safeSet('v-dev', dev.toFixed(3));
+  const devBar = $('dev-bar');
+  if (devBar) devBar.style.setProperty('--dev', (dev * 400).toFixed(0) + '%');
+  const devState = $('v-dev-state');
+  if (devState) {
+    if (dev < 0.05) { devState.textContent = 'Γ держит'; devState.style.color = '#4aff9a'; }
+    else if (dev < 0.12) { devState.textContent = 'Γ корректирует'; devState.style.color = '#ffb84a'; }
+    else { devState.textContent = 'Γ перегружен'; devState.style.color = '#ff6a9a'; }
+  }
+
+  document.querySelectorAll('#cycle-row .phase').forEach((el, i) => {
+    el.classList.toggle('active', i === cyclePhase);
+    el.classList.toggle('done', i < cyclePhase);
+  });
+  const cycleStatus = $('cycle-status');
+  if (cycleStatus) {
+    cycleStatus.innerHTML = `такт <b>${cyclePhase + 1}</b> из 7 · ${CYCLE_PHASES[cyclePhase].desc}`;
+  }
+
+  safeSet('s-total', total);
+  safeSet('s-strong', strong);
+  safeSet('s-weak', weak);
+  safeSet('s-dead', dead);
+  safeSet('s-rewires', stats.rewires);
+  safeSet('s-links', stats.links);
+
+  const ovTr = $('ov-tr');
+  if (ovTr) ovTr.textContent = `такт ${cyclePhase + 1}/7 · мышлений ${stats.thoughts}`;
+  const ovBl = $('ov-bl');
+  if (ovBl) ovBl.innerHTML = strong > 15
+    ? '<span class="hot">перегрузка</span>'
+    : '<span class="ok">устойчиво</span>';
+  const ovBr = $('ov-br');
+  if (ovBr) ovBr.textContent = `t = ${((performance.now() - startTime) / 1000).toFixed(1)} с`;
+
+  updateId();
+}
+
+/* ═══════════════════════════════════════════════
+   ЛОГ
+   ═══════════════════════════════════════════════ */
+const logEl = $('log');
+function log(text, cls) {
+  if (!logEl) return;
+  const d = document.createElement('div');
+  d.className = 'l' + (cls ? ' ' + cls : '');
+  d.innerHTML = `<b>${new Date().toTimeString().slice(0,8)}</b> · ${text}`;
+  logEl.insertBefore(d, logEl.firstChild);
+  while (logEl.children.length > 60) logEl.removeChild(logEl.lastChild);
+}
+
+/* ═══════════════════════════════════════════════
+   ПОДАЧА МЫСЛИ
+   ═══════════════════════════════════════════════ */
+function wordProfile(text) {
+  const lower = text.toLowerCase();
+  const len = lower.length;
+  const vowels = (lower.match(/[аеёиоуыэюя]/g) || []).length;
+  const consonants = (lower.match(/[бвгджзклмнпрстфхцчшщ]/g) || []).length;
+  const soft = (lower.match(/[яеёюиь]/g) || []).length;
+  const hasQ = /\?/.test(text);
+  const hasExcl = /!/.test(text);
+  const hasDot = /\./.test(text);
+
+  const p = new Array(12).fill(0);
+  p[0] = hasExcl ? +1 : hasQ ? -1 : 0;
+  p[1] = len > 5 ? +1 : 0;
+  p[2] = hasQ ? -1 : hasDot ? +1 : 0;
+  p[3] = vowels > 2 ? +1 : 0;
+  p[4] = soft > 1 ? -1 : 0;
+  p[5] = len > 8 ? +1 : 0;
+  p[6] = hasExcl ? +1 : 0;
+  p[7] = consonants > 3 ? +1 : 0;
+  p[8] = (len % 2 === 0) ? +1 : -1;
+  p[9] = hasDot ? +1 : 0;
+  p[10] = hasQ ? +1 : 0;
+  p[11] = len > 3 ? +1 : 0;
+  return p;
+}
+
+// Классификация слова по 12 осям — для дрейфа триады
+function vectorizeWord(text) {
+  const lower = text.toLowerCase();
+  // Ψ (Я): глубина, внимание, валентность(-)
+  const psiScore =
+    (/(почему|смысл|суть|понима|осозна|глубин|зачем)/.test(lower) ? 0.05 : 0) +
+    (/(сосредот|вниман|фокус|замеч)/.test(lower) ? 0.03 : 0) +
+    (/(боль|страх|тревог|груст|устал)/.test(lower) ? 0.03 : 0);
+
+  // Ω (ОНИ): агентность, уверенность, движение
+  const omegaScore =
+    (/(делать|решить|начать|иду|сдела|выбер|действ|шаг)/.test(lower) ? 0.05 : 0) +
+    (/(точно|ясно|знаю|уверен|именно|решил)/.test(lower) ? 0.03 : 0) +
+    (/(бег|иду|движ|поток|лет|путь|шаг|стрем)/.test(lower) ? 0.04 : 0);
+
+  // Λ (ТЫ): связь, граница, валентность(+)
+  const lambdaScore =
+    (/(мы|вместе|ты|между|нами|близк|друг|люди|семь)/.test(lower) ? 0.06 : 0) +
+    (/(границ|порог|между|край|стык|переход|рубеж)/.test(lower) ? 0.03 : 0) +
+    (/(рад|любл|хорош|счаст|нрав|тепл|нежн|благодар)/.test(lower) ? 0.02 : 0);
+
+  return { psi: psiScore, omega: omegaScore, lambda: lambdaScore };
+}
+
+function feedThought(text) {
+  if (!text.trim()) return;
+  stats.thoughts++;
+  stats.words += text.trim().split(/\s+/).length;
+
+  // 1. Обновляем скорости потоков от длины слова
+  const speedMod = 0.8 + (text.length % 10) * 0.04;
+  flows.psi.speed = Math.min(0.15, flows.psi.speed * 0.9 + 0.05 * speedMod);
+  flows.omega.speed = Math.min(0.15, flows.omega.speed * 0.9 + 0.04 * speedMod);
+  flows.lambda.speed = Math.min(0.15, flows.lambda.speed * 0.9 + 0.05 * speedMod);
+
+  // 2. Дрейф триады от классификации слова
+  const v = vectorizeWord(text);
+  triad.psi    += v.psi    * 0.1;
+  triad.omega  += v.omega  * 0.1;
+  triad.lambda += v.lambda * 0.1;
+
+  // нормализация
+  const s = triad.psi + triad.omega + triad.lambda;
+  triad.psi /= s; triad.omega /= s; triad.lambda /= s;
+
+  // 3. Находим ближайший нейрон к Ψ и сдвигаем его оси
+  const near = nearestNeuron(flows.psi.pos);
+  const targetIdx = near[0].i;
+  const targetLetter = NEURONS[targetIdx].l;
+
+  const profile = wordProfile(text);
+  if (NEURON_AXES[targetLetter]) {
+    for (let k = 0; k < 12; k++) {
+      NEURON_AXES[targetLetter][k] = Math.max(-1, Math.min(1,
+        NEURON_AXES[targetLetter][k] + profile[k] * 0.15
+      ));
+    }
+  }
+
+  // 4. Вспышки
+  for (let j = 0; j < N; j++) {
+    if (j === targetIdx) continue;
+    if (synapses[targetIdx][j].weight > 0.1) {
+      flashes.push({
+        i: targetIdx, j,
+        born: performance.now(),
+        life: 800,
+        color: flows.psi.color,
+      });
+    }
+  }
+
+  // 5. Лог
+  const id = makeId();
+  log(`мысль «${text.slice(0, 20)}${text.length > 20 ? '…' : ''}» → Ψ · ${targetLetter} · ${id.hash}`, 'cool');
+
+  // 6. Обновляем интерфейс
+  updateId();
+  if (pinnedNeuronIdx === targetIdx) showCard(targetIdx, true);
+}
+
+/* ═══════════════════════════════════════════════
+   КАРТОЧКА НЕЙРОНА
+   ═══════════════════════════════════════════════ */
+const cardEl = $('neuron-card');
+let hoveredNeuronIdx = -1;
+let pinnedNeuronIdx = -1;
+
+function showCard(idx, pinned) {
+  if (idx < 0) { if (cardEl) cardEl.classList.remove('show'); return; }
+  if (!cardEl) return;
+
+  const n = NEURONS[idx];
+  const axes = NEURON_AXES[n.l] || new Array(12).fill(0);
+  const p = neuronPos(idx);
+
+  let heat = 0;
+  for (let j = 0; j < N; j++) {
+    if (idx === j) continue;
+    heat += synapses[idx][j].weight;
+  }
+  const heatPct = Math.min(1, heat / 8);
+
+  let connections = 0, strongConn = 0;
+  for (let j = 0; j < N; j++) {
+    if (idx === j) continue;
+    const w = Math.max(synapses[idx][j].weight, synapses[j][idx].weight);
+    if (w > 0.1) connections++;
+    if (w > 0.6) strongConn++;
+  }
+
+  const dim = LETTER_DIM[n.l];
+  const dimColor = DIMS[dim] ? DIMS[dim].color : '#8888a0';
+  const agent = LETTER_AGENT[n.l];
+
+  let html = `<h4><span><span class="l">${n.l}</span> · ${n.name}</span>`;
+  if (dim) html += `<span class="dim d${dim}" style="color:${dimColor};border-color:${dimColor}66">${dim}D</span>`;
+  html += `</h4>`;
+  if (n.isBlind) html += `<div style="font-size:9px;color:#6b6b80;margin-bottom:4px;">слепая зона · реакция × 0.3</div>`;
+  html += `<div class="pos">heat ${(heatPct * 100).toFixed(0)}% · связей ${connections} (${strongConn} сильных)</div>`;
+  if (agent) {
+    html += `<div class="agent-badge ${agent.id === 'KLP-001' ? 'klp' : ''}">${agent.id} · ${agent.role}</div>`;
+  }
+
+  html += `<div class="axis-grid">`;
+  axes.forEach((v, k) => {
+    const barW = Math.abs(v) * 100;
+    const color = v > 0 ? '#4aff9a' : v < 0 ? '#ff6a9a' : '#2a2a3a';
+    html += `<div class="name">${AXES[k].name}</div>`;
+    html += `<div class="bar"><span style="width:${barW}%; background:${color};"></span></div>`;
+    html += `<div class="v">${v > 0 ? '+' : ''}${v.toFixed(2)}</div>`;
+  });
+  html += `</div>`;
+  html += pinned
+    ? `<div class="pin-hint">клик вне — отшпилить</div>`
+    : `<div class="pin-hint">клик — закрепить</div>`;
+
+  cardEl.innerHTML = html;
+
+  const cx = Math.min(p.x + 20, W - 320);
+  const cy = Math.max(20, Math.min(p.y - 20, H - 480));
+  cardEl.style.left = cx + 'px';
+  cardEl.style.top = cy + 'px';
+  cardEl.classList.add('show');
+  cardEl.classList.toggle('pinned', !!pinned);
+}
+
+/* ═══════════════════════════════════════════════
+   МЫШЬ
+   ═══════════════════════════════════════════════ */
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  let closest = -1, closestD = 20;
+  for (let i = 0; i < N; i++) {
+    const p = neuronPos(i);
+    const d = Math.hypot(p.x - mx, p.y - my);
+    if (d < closestD) { closestD = d; closest = i; }
+  }
+  if (closest !== hoveredNeuronIdx) {
+    hoveredNeuronIdx = closest;
+    if (pinnedNeuronIdx < 0) {
+      if (closest >= 0) showCard(closest, false);
+      else if (cardEl) cardEl.classList.remove('show');
+    }
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoveredNeuronIdx = -1;
+  if (pinnedNeuronIdx < 0 && cardEl) cardEl.classList.remove('show');
+});
+
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  let closest = -1, closestD = 20;
+  for (let i = 0; i < N; i++) {
+    const p = neuronPos(i);
+    const d = Math.hypot(p.x - mx, p.y - my);
+    if (d < closestD) { closestD = d; closest = i; }
+  }
+  if (closest >= 0) {
+    if (pinnedNeuronIdx === closest) {
+      pinnedNeuronIdx = -1;
+      if (hoveredNeuronIdx >= 0) showCard(hoveredNeuronIdx, false);
+      else if (cardEl) cardEl.classList.remove('show');
+    } else {
+      pinnedNeuronIdx = closest;
+      showCard(closest, true);
+    }
+  } else {
+    if (pinnedNeuronIdx >= 0) {
+      pinnedNeuronIdx = -1;
+      if (hoveredNeuronIdx >= 0) showCard(hoveredNeuronIdx, false);
+      else if (cardEl) cardEl.classList.remove('show');
+    }
+  }
+});
+
+/* ═══════════════════════════════════════════════
+   ВВОД
+   ═══════════════════════════════════════════════ */
+function submit() {
+  const q = $('q');
+  if (!q) return;
+  feedThought(q.value);
+  q.value = '';
+}
+$('send').addEventListener('click', submit);
+$('q').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submit();
+});
+
+/* ═══════════════════════════════════════════════
+   СКРИПТ-ФУНКЦИИ (звук, пауза)
+   ═══════════════════════════════════════════════ */
+let running = true;
+let startTime = performance.now();
+let soundOn = false;
+
+$('btn-pause').addEventListener('click', (e) => {
+  running = !running;
+  e.target.textContent = running ? '⏸' : '▶';
+});
+
+$('btn-sound').addEventListener('click', (e) => {
+  soundOn = !soundOn;
+  e.target.textContent = soundOn ? '♪●' : '♪';
+});
+
+// Копирование ID по клику
+$('id-short').addEventListener('click', () => {
+  if (!lastId) return;
+  const text = lastId.short;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text);
+    const el = $('id-short');
+    const orig = el.textContent;
+    el.textContent = '✓ скопировано';
+    setTimeout(() => { el.textContent = orig; }, 1200);
+    log('ID скопирован в буфер', 'ok');
+  }
+});
+
+// Сворачивание панелей
+document.querySelectorAll('.panel h3').forEach(h => {
+  h.addEventListener('click', () => h.parentElement.classList.toggle('collapsed'));
+});
+
+/* ═══════════════════════════════════════════════
+   ГЛАВНЫЙ ЦИКЛ
+   ═══════════════════════════════════════════════ */
+let lastTime = performance.now();
+let tick = 0;
+
+function tickFn() {
+  if (!running) { lastTime = performance.now(); return; }
+  const now = performance.now();
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+  tick++;
+
+  // 7-тактный цикл
+  cycleTick++;
+  if (cycleTick >= tickLen) {
+    cycleTick = 0;
+    cyclePhase = (cyclePhase + 1) % 7;
+  }
+
+  // потоки
+  stepFlow(flows.psi, dt);
+  stepFlow(flows.omega, dt);
+  stepFlow(flows.lambda, dt);
+  stepFlow(flows.gamma, dt);
+
+  // затухание
+  decaySynapses(dt);
+
+  // триада: дрейф + V = −k·δ
+  triadStep(dt);
+
+  updateHUD();
+}
+
+/* ═══════════════════════════════════════════════
+   СТАРТ
+   ═══════════════════════════════════════════════ */
+function boot() {
+  resize();
+  initSynapses();
+  updateHUD();
+  updateId();
+  log('MONOMOD · минимальная сборка', 'ok');
+  log('26 нейронов · 12 осей · 7 агентов · 5 мерностей', 'ok');
+  log('триада 1:1:1 · V = −k·δ · k = 0.5', 'cool');
+  log('7-тактный цикл управляет ролями потоков', 'cool');
+  log('подай слово — сдвинет оси и триаду', 'cool');
+
+  setInterval(tickFn, 16);
+  requestAnimationFrame(render);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}
+</script>
+
+</body>
+</html>
