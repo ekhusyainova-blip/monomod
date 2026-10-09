@@ -10,6 +10,7 @@ const ASSETS = [
 + './modules/lambda/generator.js',
 + './modules/lambda/klepa.js',
   './modules/omega/pack.js', './modules/omega/canon.js',
++ './modules/omega/translator.js',
   './renderers/sphere.js', './renderers/input.js',
 + './renderers/output.js',
   './styles/monomod.css', './styles/index.css',
