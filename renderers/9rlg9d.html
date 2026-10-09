@@ -1,0 +1,3024 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>мозг · GIT4.12 · ABCDE</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    background: #05050a; color: #e8e8f0; font-size: 13px;
+    overscroll-behavior: none;
+  }
+  #app {
+    display: grid;
+    grid-template-columns: 1fr 440px;
+    grid-template-rows: 42px 1fr auto;
+    height: 100vh;
+  }
+  #hud {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 12px;
+    background: #0a0a12;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 11px; color: #8888a0;
+    overflow-x: auto; white-space: nowrap;
+    scrollbar-width: none;
+  }
+  #hud::-webkit-scrollbar { display: none; }
+  #hud b { color: #e8e8f0; font-weight: normal; }
+  #hud .hot { color: #ff6a9a; }
+  #hud .ok { color: #4aff9a; }
+  #hud .warn { color: #ffb84a; }
+  #hud .cool { color: #7aa2ff; }
+  #hud .spacer { margin-left: auto; }
+  #hud button {
+    background: transparent; color: #8888a0;
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 4px 8px; border-radius: 3px;
+    font: inherit; font-size: 10.5px;
+    cursor: pointer; transition: all 0.15s;
+    white-space: nowrap;
+  }
+  #hud button:hover { color: #e8e8f0; border-color: rgba(255,255,255,0.25); }
+  #hud button.active { color: #ff6a9a; border-color: #ff6a9a; }
+  #hud button.on { color: #4aff9a; border-color: #4aff9a; background: rgba(74,255,154,0.08); }
+  #hud button.warn { color: #ffb84a; border-color: rgba(255,184,74,0.3); }
+
+  #stage {
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 45%, #0b0b16, #03030a 75%);
+  }
+  canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+  .corner { position: absolute; font-size: 9.5px; color: #5c5c70; letter-spacing: 0.1em; pointer-events: none; }
+  .tl { top: 10px; left: 12px; }
+  .tr { top: 10px; right: 12px; text-align: right; }
+  .bl { bottom: 10px; left: 12px; }
+  .br { bottom: 10px; right: 12px; text-align: right; }
+  .corner b { color: #e8e8f0; font-weight: normal; }
+  .corner .ok { color: #4aff9a; }
+  .corner .hot { color: #ff6a9a; }
+  .corner .cool { color: #7aa2ff; }
+
+  #legend {
+    position: absolute;
+    top: 40px; left: 12px;
+    font-size: 9.5px; color: #5c5c70;
+    line-height: 1.9;
+    background: rgba(10,10,18,0.82);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 4px;
+    padding: 9px 12px;
+    pointer-events: none;
+    max-width: 240px;
+  }
+  #legend .row { display: flex; align-items: flex-start; gap: 7px; }
+  #legend .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  #legend .txt { font-size: 9.5px; line-height: 1.4; }
+  #legend .txt b { color: #b8b8c8; font-weight: normal; }
+  #legend .txt small { color: #4a4a5a; display: block; font-size: 8.5px; }
+
+  /* ======== КАРТОЧКА НЕЙРОНА ======== */
+  #neuron-card {
+    position: absolute;
+    background: rgba(10,10,18,0.96);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 5px;
+    padding: 10px 12px;
+    font-size: 10.5px;
+    color: #b8b8c8;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    max-width: 300px;
+    line-height: 1.5;
+    backdrop-filter: blur(6px);
+    z-index: 10;
+  }
+  #neuron-card.show { opacity: 1; }
+  #neuron-card.pinned {
+    pointer-events: auto;
+    border-color: rgba(255,106,154,0.5);
+    box-shadow: 0 0 20px rgba(255,106,154,0.15);
+  }
+  #neuron-card h4 {
+    font-size: 11.5px; font-weight: normal;
+    color: #e8e8f0; margin-bottom: 6px;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  }
+  #neuron-card h4 .l { color: #ff6a9a; font-weight: bold; font-size: 13px; }
+  #neuron-card h4 .dim {
+    font-size: 9px; padding: 2px 5px;
+    border-radius: 3px; border: 1px solid;
+  }
+  #neuron-card h4 .dim.d1 { color: #4ac9ff; border-color: rgba(74,201,255,0.5); }
+  #neuron-card h4 .dim.d2 { color: #4aff9a; border-color: rgba(74,255,154,0.5); }
+  #neuron-card h4 .dim.d3 { color: #ffb84a; border-color: rgba(255,184,74,0.5); }
+  #neuron-card h4 .dim.d4 { color: #ff6a9a; border-color: rgba(255,106,154,0.5); }
+  #neuron-card h4 .dim.d5 { color: #c8a4ff; border-color: rgba(200,164,255,0.5); }
+  #neuron-card .agent-badge {
+    display: inline-block; font-size: 9px;
+    padding: 1px 5px; border-radius: 2px;
+    background: rgba(143,216,184,0.12);
+    color: #8fd8b8; margin-top: 4px;
+  }
+  #neuron-card .agent-badge.klp {
+    background: rgba(255,106,154,0.12);
+    color: #ff6a9a;
+  }
+  #neuron-card .pos { color: #6b6b80; font-size: 10px; margin-bottom: 4px; }
+  #neuron-card .axis-grid {
+    display: grid;
+    grid-template-columns: 70px 1fr 40px;
+    gap: 3px 6px;
+    font-size: 10px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dotted rgba(255,255,255,0.08);
+  }
+  #neuron-card .axis-grid .name { color: #6b6b80; }
+  #neuron-card .axis-grid .bar {
+    height: 4px; background: rgba(255,255,255,0.06);
+    border-radius: 2px; overflow: hidden; align-self: center;
+  }
+  #neuron-card .axis-grid .bar span { display: block; height: 100%; border-radius: 2px; }
+  #neuron-card .axis-grid .v {
+    font-variant-numeric: tabular-nums;
+    color: #e8e8f0; font-size: 9.5px; text-align: right;
+  }
+  #neuron-card .pin-hint {
+    font-size: 9px; color: #6b6b80;
+    margin-top: 6px; padding-top: 4px;
+    border-top: 1px dotted rgba(255,255,255,0.08);
+    text-align: right;
+  }
+  #axis-editor {
+    margin-top: 8px; padding-top: 8px;
+    border-top: 1px dotted rgba(255,255,255,0.12);
+  }
+  #axis-editor .title {
+    font-size: 9px; color: #7aa2ff;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 6px;
+  }
+  #axis-editor .slider-row {
+    display: grid;
+    grid-template-columns: 60px 1fr 34px;
+    gap: 6px; align-items: center;
+    font-size: 9.5px; margin-bottom: 3px;
+  }
+  #axis-editor .slider-row label { color: #6b6b80; }
+  #axis-editor .slider-row input[type=range] {
+    -webkit-appearance: none;
+    width: 100%; height: 3px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px; outline: none;
+  }
+  #axis-editor .slider-row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px; height: 10px;
+    background: #ff6a9a; border-radius: 50%; cursor: pointer;
+  }
+  #axis-editor .slider-row .val {
+    font-variant-numeric: tabular-nums;
+    color: #e8e8f0; font-size: 9px; text-align: right;
+  }
+  #axis-editor .row {
+    display: flex; gap: 4px; margin-top: 6px;
+  }
+  #axis-editor .row button {
+    flex: 1;
+    background: transparent; color: #6b6b80;
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 4px; border-radius: 3px;
+    font: inherit; font-size: 9.5px;
+    cursor: pointer;
+  }
+  #axis-editor .row button:hover { color: #e8e8f0; }
+
+  /* ======== 26D КАРТОЧКА ======== */
+  #dim26-card {
+    position: absolute;
+    background: rgba(10,10,18,0.96);
+    border: 1px solid rgba(122,162,255,0.4);
+    border-radius: 5px;
+    padding: 10px 12px;
+    font-size: 10.5px;
+    color: #b8b8c8;
+    opacity: 0;
+    transition: opacity 0.15s;
+    width: 400px;
+    max-height: 520px;
+    overflow-y: auto;
+    line-height: 1.5;
+    backdrop-filter: blur(6px);
+    z-index: 20;
+    pointer-events: none;
+  }
+  #dim26-card.show { opacity: 1; pointer-events: auto; }
+  #dim26-card h4 {
+    font-size: 11.5px; color: #e8e8f0;
+    font-weight: normal; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  #dim26-card h4 .close {
+    cursor: pointer; color: #6b6b80;
+    padding: 2px 6px; border-radius: 3px;
+    font-size: 11px;
+  }
+  #dim26-card h4 .close:hover { color: #ff6a9a; }
+  #dim26-card .desc {
+    font-size: 10px; color: #6b6b80;
+    line-height: 1.5; margin-bottom: 8px;
+  }
+  #dim26-grid {
+    display: grid;
+    grid-template-columns: 24px 1fr 30px;
+    gap: 3px 6px;
+    font-size: 10px;
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px dotted rgba(255,255,255,0.08);
+  }
+  #dim26-grid .letter { color: #ff6a9a; font-weight: bold; text-align: center; }
+  #dim26-grid .bar {
+    height: 6px; background: rgba(255,255,255,0.06);
+    border-radius: 3px; overflow: hidden; align-self: center;
+  }
+  #dim26-grid .bar span { display: block; height: 100%; border-radius: 3px; }
+  #dim26-grid .v {
+    font-variant-numeric: tabular-nums;
+    color: #e8e8f0; font-size: 9.5px; text-align: right;
+  }
+
+  /* ======== 26×26 HEATMAP ======== */
+  #heatmap-card {
+    position: absolute;
+    background: rgba(10,10,18,0.97);
+    border: 1px solid rgba(255,106,154,0.4);
+    border-radius: 5px;
+    padding: 12px 14px;
+    color: #b8b8c8;
+    opacity: 0;
+    transition: opacity 0.15s;
+    width: 620px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: auto;
+    backdrop-filter: blur(8px);
+    z-index: 30;
+    pointer-events: none;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  #heatmap-card.show { opacity: 1; pointer-events: auto; }
+  #heatmap-card h4 {
+    font-size: 12px; color: #e8e8f0;
+    font-weight: normal; margin-bottom: 10px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  #heatmap-card h4 .close {
+    cursor: pointer; color: #6b6b80;
+    padding: 2px 6px; border-radius: 3px;
+  }
+  #heatmap-card h4 .close:hover { color: #ff6a9a; }
+  #heatmap-card .desc {
+    font-size: 10.5px; color: #6b6b80;
+    margin-bottom: 10px; line-height: 1.5;
+  }
+  #hm-grid {
+    display: grid;
+    grid-template-columns: 24px repeat(26, 1fr);
+    gap: 1px;
+    font-size: 8px;
+    user-select: none;
+  }
+  #hm-grid .cell {
+    aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px;
+    border-radius: 1px;
+    cursor: pointer;
+    transition: transform 0.1s;
+    position: relative;
+  }
+  #hm-grid .cell:hover { transform: scale(1.4); z-index: 2; outline: 1px solid #ff6a9a; }
+  #hm-grid .label {
+    color: #6b6b80; text-align: center;
+    font-size: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #hm-legend {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px; color: #6b6b80;
+    margin-top: 10px; padding-top: 8px;
+    border-top: 1px dotted rgba(255,255,255,0.08);
+  }
+  #hm-legend .bar {
+    flex: 1; height: 6px;
+    background: linear-gradient(90deg, #1a1a2a, #4a4a7a, #c8a4ff, #ff6a9a);
+    border-radius: 3px;
+  }
+  #hm-legend b { color: #e8e8f0; font-weight: normal; }
+
+  /* ======== DIFF CARD ======== */
+  #diff-card {
+    position: absolute;
+    background: rgba(10,10,18,0.97);
+    border: 1px solid rgba(74,255,154,0.4);
+    border-radius: 5px;
+    padding: 12px 14px;
+    color: #b8b8c8;
+    opacity: 0;
+    transition: opacity 0.15s;
+    width: 480px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow: auto;
+    backdrop-filter: blur(8px);
+    z-index: 40;
+    pointer-events: none;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  #diff-card.show { opacity: 1; pointer-events: auto; }
+  #diff-card h4 {
+    font-size: 12px; color: #e8e8f0;
+    font-weight: normal; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  #diff-card h4 .close {
+    cursor: pointer; color: #6b6b80;
+    padding: 2px 6px; border-radius: 3px;
+  }
+  #diff-card h4 .close:hover { color: #ff6a9a; }
+  #diff-card .meta {
+    font-size: 10px; color: #6b6b80;
+    margin-bottom: 10px;
+    line-height: 1.6;
+  }
+  #diff-card .meta b { color: #e8e8f0; font-weight: normal; }
+  #diff-card .section {
+    margin-top: 10px; padding-top: 8px;
+    border-top: 1px dotted rgba(255,255,255,0.08);
+  }
+  #diff-card .section h5 {
+    font-size: 10px; color: #7aa2ff;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 6px;
+    font-weight: normal;
+  }
+  #diff-card .edge {
+    display: grid;
+    grid-template-columns: 40px 30px 30px 1fr;
+    gap: 6px;
+    font-size: 10px;
+    padding: 2px 0;
+    align-items: center;
+  }
+  #diff-card .edge .plus { color: #4aff9a; }
+  #diff-card .edge .minus { color: #ff6a9a; }
+  #diff-card .edge .arrow { color: #6b6b80; }
+  #diff-card .edge .bar {
+    height: 4px; background: rgba(255,255,255,0.06);
+    border-radius: 2px; overflow: hidden;
+  }
+  #diff-card .edge .bar span { display: block; height: 100%; }
+  #diff-card .axis-change {
+    display: grid;
+    grid-template-columns: 30px 90px 50px 30px 50px;
+    gap: 6px;
+    font-size: 10px;
+    padding: 2px 0;
+    align-items: center;
+  }
+  #diff-card .axis-change .l { color: #ff6a9a; }
+  #diff-card .axis-change .name { color: #6b6b80; }
+  #diff-card .axis-change .old { color: #8888a0; text-align: right; }
+  #diff-card .axis-change .arrow { color: #6b6b80; text-align: center; }
+  #diff-card .axis-change .new { color: #e8e8f0; text-align: right; }
+  #diff-card .axis-change .delta { color: #4aff9a; text-align: right; }
+  #diff-card .axis-change .delta.neg { color: #ff6a9a; }
+  #diff-card .summary {
+    font-size: 10.5px; color: #e8e8f0;
+    margin-top: 10px; padding: 8px;
+    background: rgba(74,255,154,0.06);
+    border-left: 2px solid #4aff9a;
+    border-radius: 3px;
+    line-height: 1.6;
+  }
+
+  /* ======== MERGE CARD ======== */
+  #merge-card {
+    position: absolute;
+    background: rgba(10,10,18,0.97);
+    border: 1px solid rgba(200,164,255,0.5);
+    border-radius: 5px;
+    padding: 14px 16px;
+    color: #b8b8c8;
+    opacity: 0;
+    transition: opacity 0.15s;
+    width: 520px;
+    max-width: 90vw;
+    backdrop-filter: blur(8px);
+    z-index: 50;
+    pointer-events: none;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  #merge-card.show { opacity: 1; pointer-events: auto; }
+  #merge-card h4 {
+    font-size: 12.5px; color: #e8e8f0;
+    font-weight: normal; margin-bottom: 10px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  #merge-card h4 .close {
+    cursor: pointer; color: #6b6b80;
+    padding: 2px 6px; border-radius: 3px;
+  }
+  #merge-card h4 .close:hover { color: #ff6a9a; }
+  #merge-card .branches {
+    display: grid;
+    grid-template-columns: 1fr 40px 1fr;
+    gap: 12px; align-items: center;
+    margin-bottom: 14px;
+  }
+  #merge-card .branch {
+    padding: 10px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    text-align: center;
+  }
+  #merge-card .branch.a { border-color: rgba(122,162,255,0.4); }
+  #merge-card .branch.b { border-color: rgba(255,168,64,0.4); }
+  #merge-card .branch .name {
+    font-size: 11px; color: #e8e8f0;
+    margin-bottom: 4px;
+  }
+  #merge-card .branch .info {
+    font-size: 10px; color: #6b6b80;
+  }
+  #merge-card .arrow {
+    text-align: center;
+    color: #c8a4ff;
+    font-size: 18px;
+  }
+  #merge-card .strategy {
+    display: flex; gap: 6px;
+    margin: 10px 0;
+  }
+  #merge-card .strategy button {
+    flex: 1;
+    background: transparent;
+    color: #6b6b80;
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 6px 4px;
+    border-radius: 3px;
+    font: inherit; font-size: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  #merge-card .strategy button:hover { color: #e8e8f0; }
+  #merge-card .strategy button.active {
+    color: #c8a4ff;
+    border-color: rgba(200,164,255,0.5);
+    background: rgba(200,164,255,0.08);
+  }
+  #merge-card .conflicts {
+    font-size: 10px;
+    line-height: 1.6;
+    color: #6b6b80;
+    max-height: 160px;
+    overflow-y: auto;
+    margin: 8px 0;
+    padding: 8px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 3px;
+  }
+  #merge-card .conflicts b { color: #e8e8f0; font-weight: normal; }
+  #merge-card .conflicts .edge { color: #ffb84a; }
+  #merge-card .apply {
+    width: 100%;
+    padding: 8px;
+    background: rgba(200,164,255,0.12);
+    color: #c8a4ff;
+    border: 1px solid rgba(200,164,255,0.5);
+    border-radius: 3px;
+    font: inherit; font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  #merge-card .apply:hover {
+    background: rgba(200,164,255,0.2);
+  }
+
+  #side {
+    background: #0a0a12;
+    border-left: 1px solid rgba(255,255,255,0.06);
+    display: flex; flex-direction: column;
+    overflow-y: auto; overflow-x: hidden;
+  }
+  .panel {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+  }
+  .panel h3 {
+    font-size: 9.5px; font-weight: normal;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #6b6b80;
+    margin-bottom: 8px;
+    cursor: pointer; user-select: none;
+  }
+  .panel h3::after { content: " ▾"; opacity: 0.4; font-size: 8px; }
+  .panel.collapsed h3::after { content: " ▸"; }
+  .panel.collapsed > *:not(h3) { display: none; }
+
+  #triad-row { display: flex; gap: 6px; margin-bottom: 6px; }
+  #triad-row > div {
+    flex: 1; text-align: center;
+    padding: 6px 4px;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px;
+    font-size: 10px; color: #8888a0;
+  }
+  #triad-row .v {
+    display: block; font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    margin-top: 2px; color: #e8e8f0;
+  }
+  #triad-row .omega { color: #7aa2ff; border-color: rgba(122,162,255,0.3); }
+  #triad-row .psi { color: #e8c39e; border-color: rgba(232,195,158,0.3); }
+  #triad-row .lambda { color: #ffa840; border-color: rgba(255,168,64,0.3); }
+  #dev-bar {
+    height: 4px; background: rgba(255,255,255,0.06);
+    border-radius: 2px; overflow: hidden; margin-top: 4px;
+  }
+  #dev-bar::after {
+    content: ""; display: block; height: 100%;
+    width: var(--dev, 0%);
+    background: linear-gradient(90deg, #4aff9a, #ffb84a, #ff6a9a);
+    transition: width 0.3s;
+  }
+  #dev-label {
+    font-size: 10px; color: #8888a0;
+    margin-top: 4px;
+    display: flex; justify-content: space-between;
+  }
+
+  #cycle-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px; margin-bottom: 6px;
+  }
+  #cycle-row .phase {
+    text-align: center;
+    padding: 4px 2px;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 3px;
+    font-size: 8.5px;
+    color: #4a4a5a;
+    transition: all 0.2s;
+  }
+  #cycle-row .phase.active {
+    color: #ff6a9a;
+    border-color: rgba(255,106,154,0.6);
+    background: rgba(255,106,154,0.08);
+  }
+  #cycle-row .phase.done {
+    color: #4aff9a;
+    border-color: rgba(74,255,154,0.3);
+  }
+  #cycle-status {
+    font-size: 10px; color: #6b6b80;
+    line-height: 1.5;
+  }
+
+  /* GIT4 */
+  #git-branch {
+    font-size: 10.5px; line-height: 1.7;
+    color: #b8b8c8;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  #git-branch .commit {
+    display: grid;
+    grid-template-columns: 60px 1fr auto;
+    gap: 6px;
+    padding: 3px 6px;
+    border-radius: 3px;
+    align-items: center;
+    font-size: 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-left: 2px solid transparent;
+  }
+  #git-branch .commit:hover { background: rgba(255,255,255,0.04); }
+  #git-branch .commit.head {
+    border-left-color: #ff6a9a;
+    background: rgba(255,106,154,0.06);
+  }
+  #git-branch .commit.branch-other {
+    border-left-color: #c8a4ff;
+  }
+  #git-branch .commit .hash { color: #7aa2ff; font-size: 9.5px; }
+  #git-branch .commit .msg { color: #e8e8f0; }
+  #git-branch .commit .time { color: #4a4a5a; font-size: 9px; }
+  #git-branch .commit .msg small { color: #6b6b80; display: block; font-size: 9px; }
+  #git-branch .branch-label {
+    font-size: 10px; color: #c8a4ff;
+    padding: 4px 6px;
+    margin-top: 6px;
+    border-top: 1px dotted rgba(255,255,255,0.08);
+    display: flex; justify-content: space-between;
+  }
+  #git-branch .branch-label .current { color: #4aff9a; }
+  #git-status {
+    font-size: 10px; color: #6b6b80;
+    line-height: 1.5;
+    margin-top: 6px; padding-top: 6px;
+    border-top: 1px dotted rgba(255,255,255,0.08);
+  }
+  #git-status b { color: #e8e8f0; font-weight: normal; }
+
+  #git-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3px;
+    margin-top: 6px;
+  }
+  #git-actions button {
+    background: transparent; color: #6b6b80;
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 5px 2px;
+    border-radius: 3px;
+    font: inherit; font-size: 9.5px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  #git-actions button:hover { color: #e8e8f0; border-color: rgba(255,255,255,0.2); }
+  #git-actions button.cool { color: #7aa2ff; border-color: rgba(122,162,255,0.3); }
+  #git-actions button.warn { color: #ffb84a; border-color: rgba(255,184,74,0.3); }
+  #git-actions button.hot { color: #ff6a9a; border-color: rgba(255,106,154,0.3); }
+  #git-actions button.purple { color: #c8a4ff; border-color: rgba(200,164,255,0.3); }
+
+  /* 5 модов */
+  #modes-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 3px; margin-bottom: 6px;
+  }
+  #modes-row button {
+    background: transparent; color: #6b6b80;
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 5px 2px; border-radius: 3px;
+    font: inherit; font-size: 9px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #modes-row button:hover { color: #e8e8f0; }
+  #modes-row button.active {
+    color: #4aff9a;
+    border-color: rgba(74,255,154,0.5);
+    background: rgba(74,255,154,0.08);
+  }
+  #mode-desc {
+    font-size: 10px; color: #6b6b80;
+    line-height: 1.5;
+    margin-bottom: 4px;
+  }
+  #mode-desc b { color: #e8e8f0; font-weight: normal; }
+  #mode-flows {
+    font-size: 9.5px; color: #6b6b80;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+  }
+  #mode-flows span { text-align: center; padding: 2px; }
+  #mode-flows span b { display: block; color: #e8e8f0; font-weight: normal; }
+
+  /* ∇n */
+  #gradient-row {
+    display: flex; gap: 4px; align-items: center;
+    margin-bottom: 4px;
+  }
+  #gradient-row input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    outline: none;
+  }
+  #gradient-row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    background: #4aff9a; border-radius: 50%; cursor: pointer;
+  }
+  #gradient-row .val {
+    color: #e8e8f0; font-variant-numeric: tabular-nums;
+    font-size: 10.5px; min-width: 34px; text-align: right;
+  }
+  #gradient-info {
+    font-size: 10px; color: #6b6b80;
+    line-height: 1.5;
+  }
+  #gradient-info b { color: #e8e8f0; font-weight: normal; }
+
+  /* K₁ K₂ K₃ */
+  #core-row {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 6px;
+    font-size: 10px;
+    color: #6b6b80;
+    line-height: 1.6;
+  }
+  #core-row .key { color: #7aa2ff; }
+  #core-row .val { color: #e8e8f0; text-align: right; }
+
+  .slider-row {
+    display: grid;
+    grid-template-columns: 90px 1fr 50px;
+    gap: 6px; align-items: center;
+    font-size: 10.5px; margin-bottom: 5px;
+  }
+  .slider-row label { color: #6b6b80; }
+  .slider-row input[type=range] {
+    -webkit-appearance: none;
+    width: 100%; height: 3px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px; outline: none;
+  }
+  .slider-row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 11px; height: 11px;
+    background: #7aa2ff; border-radius: 50%; cursor: pointer;
+  }
+  .slider-row input[type=range]::-moz-range-thumb {
+    width: 11px; height: 11px;
+    background: #7aa2ff; border-radius: 50%; cursor: pointer; border: none;
+  }
+  .slider-row .val {
+    color: #e8e8f0; font-variant-numeric: tabular-nums;
+    text-align: right; font-size: 10px;
+  }
+  .slider-row.psi input[type=range]::-webkit-slider-thumb { background: #e8c39e; }
+  .slider-row.omega input[type=range]::-webkit-slider-thumb { background: #7aa2ff; }
+  .slider-row.lambda input[type=range]::-webkit-slider-thumb { background: #ffa840; }
+  .slider-row.gamma input[type=range]::-webkit-slider-thumb { background: #8fd8b8; }
+
+  #flows { display: flex; flex-direction: column; gap: 5px; font-size: 10.5px; }
+  .flow-row {
+    display: grid;
+    grid-template-columns: 14px 1fr auto;
+    gap: 8px; align-items: center;
+  }
+  .flow-row .badge {
+    width: 12px; height: 12px;
+    border-radius: 50%; border: 1.5px solid;
+  }
+  .flow-row .badge.psi { color: #e8c39e; border-color: currentColor; }
+  .flow-row .badge.omega { color: #7aa2ff; border-color: currentColor; }
+  .flow-row .badge.lambda { color: #ffa840; border-color: currentColor; }
+  .flow-row .badge.gamma { color: #8fd8b8; border-color: currentColor; }
+  .flow-row .name { color: #b8b8c8; }
+  .flow-row .name small { color: #4a4a5a; font-size: 9px; display: block; }
+  .flow-row .pos { font-variant-numeric: tabular-nums; color: #8888a0; font-size: 10px; }
+
+  #syn-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px 8px;
+    font-size: 10.5px;
+    color: #8888a0;
+  }
+  #syn-stats span:nth-child(even) {
+    text-align: right; color: #e8e8f0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #dims-row {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 3px; margin-bottom: 6px;
+  }
+  #dims-row button {
+    background: transparent; color: #6b6b80;
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 4px 2px; border-radius: 3px;
+    font: inherit; font-size: 9.5px;
+    cursor: pointer;
+  }
+  #dims-row button:hover { color: #e8e8f0; }
+  #dims-row button.active {
+    color: #ffb84a;
+    border-color: rgba(255,184,74,0.5);
+    background: rgba(255,184,74,0.08);
+  }
+  #dim-desc {
+    font-size: 10px; color: #6b6b80;
+    line-height: 1.5;
+  }
+
+  #agents-list {
+    display: flex; flex-direction: column; gap: 3px;
+    font-size: 10px;
+  }
+  .agent-row {
+    display: grid;
+    grid-template-columns: 56px 1fr auto auto;
+    gap: 6px;
+    padding: 4px 6px;
+    border-radius: 3px;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.15s;
+    border: 1px solid transparent;
+  }
+  .agent-row:hover { background: rgba(255,255,255,0.04); }
+  .agent-row.klp { border-left: 2px solid #ff6a9a; }
+  .agent-row.gen1 { border-left: 2px solid #4ac9ff; }
+  .agent-row.gen2 { border-left: 2px solid #ffb84a; }
+  .agent-row.gen3 { border-left: 2px solid #c8a4ff; }
+  .agent-row.highlight { background: rgba(143,216,184,0.12); border-color: rgba(143,216,184,0.3); }
+  .agent-row.muted { opacity: 0.35; }
+  .agent-row .id { color: #6b6b80; font-size: 9.5px; }
+  .agent-row .role { color: #b8b8c8; }
+  .agent-row .role small { color: #4a4a5a; font-size: 9px; display: block; }
+  .agent-row .letter {
+    color: #e8e8f0; font-weight: bold; font-size: 11px;
+    padding: 1px 5px; border-radius: 2px;
+    background: rgba(255,255,255,0.06);
+    white-space: nowrap;
+  }
+  .agent-row .toggle {
+    font-size: 9px;
+    color: #4a4a5a;
+    padding: 2px 4px;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .agent-row .toggle.on { color: #4aff9a; border-color: rgba(74,255,154,0.3); }
+
+  #home3-row { display: flex; gap: 4px; margin-bottom: 4px; flex-wrap: wrap; }
+  #home3-row button {
+    flex: 1; min-width: 60px;
+    background: transparent; color: #6b6b80;
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 5px 4px; border-radius: 3px;
+    font: inherit; font-size: 10px;
+    cursor: pointer;
+  }
+  #home3-row button:hover { color: #e8e8f0; border-color: rgba(255,255,255,0.2); }
+  #home3-row button.warn { color: #ffb84a; border-color: rgba(255,184,74,0.3); }
+  #home3-row button.cool { color: #7aa2ff; border-color: rgba(122,162,255,0.3); }
+  #home3-row button.hot { color: #ff6a9a; border-color: rgba(255,106,154,0.3); }
+  #home3-status {
+    font-size: 10px; color: #6b6b80;
+    line-height: 1.5;
+  }
+
+  #log-panel {
+    flex: 1;
+    display: flex; flex-direction: column;
+    min-height: 140px;
+    overflow: hidden;
+    padding: 10px 12px;
+  }
+  #log-panel h3 { flex-shrink: 0; }
+  #log {
+    flex: 1; overflow-y: auto;
+    font-size: 10.5px; line-height: 1.55;
+    padding-right: 4px;
+  }
+  #log .l {
+    padding: 2px 0;
+    border-bottom: 1px dotted rgba(255,255,255,0.04);
+    word-break: break-word;
+  }
+  #log .l b { color: #8fb8d8; font-weight: normal; }
+  #log .l.hot { color: #ff6a9a; }
+  #log .l.cool { color: #7aa2ff; }
+  #log .l.ok { color: #4aff9a; }
+  #log .l.warn { color: #ffb84a; }
+
+  #input-row {
+    grid-column: 1 / -1;
+    padding: 10px 14px;
+    background: #0a0a12;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex; gap: 8px; align-items: center;
+  }
+  #q {
+    flex: 1;
+    background: transparent;
+    border: none; outline: none;
+    color: #e8e8f0; font: inherit; font-size: 14px;
+    padding: 6px 0;
+  }
+  #q::placeholder { color: rgba(255,255,255,0.2); }
+  #send {
+    background: transparent; color: #8888a0;
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 6px 12px; border-radius: 3px;
+    font: inherit; font-size: 12px;
+    cursor: pointer;
+  }
+  #send:hover { color: #e8e8f0; border-color: rgba(255,255,255,0.3); }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.15);
+    border-radius: 3px;
+  }
+
+  @media (max-width: 900px) {
+    #app { grid-template-columns: 1fr; grid-template-rows: 40px 1fr auto auto; }
+    #side { border-left: none; border-top: 1px solid rgba(255,255,255,0.06); max-height: 45vh; }
+    #heatmap-card { width: 95vw; }
+    #diff-card { width: 95vw; }
+    #merge-card { width: 95vw; }
+    #dim26-card { width: calc(100vw - 40px); }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <div id="hud">
+    <span>мозг · <b id="h-version">GIT4.12</b></span>
+    <span>синапсов · <b id="h-synapses" class="cool">0</b></span>
+    <span>такт · <b id="h-cycle">collect</b></span>
+    <span>ветка · <b id="h-branch" class="ok">HOME3</b></span>
+    <span>head · <b id="h-head" class="hot">—</b></span>
+    <span>K = <b id="h-core-energy" class="warn">110.347</b></span>
+    <span>∇n = <b id="h-nabla" class="cool">0.00</b></span>
+    <span>мод · <b id="h-mode" class="ok">ДИАЛОГ</b></span>
+    <span class="spacer"></span>
+    <button id="btn-sound">♪</button>
+    <button id="btn-pause">⏸</button>
+    <button id="btn-heatmap" class="warn">26×26</button>
+    <button id="btn-commit">⎇ commit</button>
+    <button id="btn-export">↓ json</button>
+    <button id="btn-import">↑ json</button>
+  </div>
+
+  <div id="stage">
+    <canvas id="canvas"></canvas>
+
+    <div class="corner tl">◈ GIT4.12 · ABCDE · 26 нейронов · 12 осей · 7 агентов · 5 модов</div>
+    <div class="corner tr" id="ov-tr">—</div>
+    <div class="corner bl" id="ov-bl">устойчиво</div>
+    <div class="corner br" id="ov-br">t = 0.0 с</div>
+
+    <div id="legend">
+      <div class="row"><span class="dot" style="background:#e8c39e"></span><div class="txt"><b>Ψ (Я)</b><small>P1 · генерация</small></div></div>
+      <div class="row"><span class="dot" style="background:#7aa2ff"></span><div class="txt"><b>Ω (ОНИ)</b><small>P3/P6 · проверка</small></div></div>
+      <div class="row"><span class="dot" style="background:#ffa840"></span><div class="txt"><b>Λ (ТЫ)</b><small>P7/P9 · разрыв</small></div></div>
+      <div class="row"><span class="dot" style="background:#8fd8b8"></span><div class="txt"><b>Γ (Клепа)</b><small>P4/P8 · перераспределение</small></div></div>
+    </div>
+
+    <div id="neuron-card"></div>
+    <div id="dim26-card">
+      <h4>
+        <span id="dim26-title">26D-развёртка</span>
+        <span class="close" id="dim26-close">✕</span>
+      </h4>
+      <div class="desc" id="dim26-desc">—</div>
+      <div id="dim26-grid"></div>
+    </div>
+
+    <div id="heatmap-card">
+      <h4>
+        <span>26×26 матрица · синаптическая карта</span>
+        <span class="close" id="heatmap-close">✕</span>
+      </h4>
+      <div class="desc" id="hm-desc">—</div>
+      <div id="hm-grid"></div>
+      <div id="hm-legend">
+        <span>0</span>
+        <div class="bar"></div>
+        <span>1</span>
+        <b id="hm-max-info">max = —</b>
+      </div>
+    </div>
+
+    <div id="diff-card">
+      <h4>
+        <span id="diff-title">Diff между коммитами</span>
+        <span class="close" id="diff-close">✕</span>
+      </h4>
+      <div class="meta" id="diff-meta">—</div>
+      <div id="diff-body"></div>
+    </div>
+
+    <div id="merge-card">
+      <h4>
+        <span>Merge веток</span>
+        <span class="close" id="merge-close">✕</span>
+      </h4>
+      <div class="branches" id="merge-branches">—</div>
+      <div class="strategy" id="merge-strategy">
+        <button data-s="ours" class="active">ours</button>
+        <button data-s="theirs">theirs</button>
+        <button data-s="union">union</button>
+        <button data-s="weighted">weighted</button>
+      </div>
+      <div class="conflicts" id="merge-conflicts">—</div>
+      <button class="apply" id="merge-apply">⎈ применить merge</button>
+    </div>
+  </div>
+
+  <div id="side">
+
+    <div class="panel" id="p-triad">
+      <h3>триада 1:1:1 · V = −k·δ</h3>
+      <div id="triad-row">
+        <div class="omega">ОНИ (Ω)<span class="v" id="v-omega">0.33</span></div>
+        <div class="psi">Я (Ψ)<span class="v" id="v-psi">0.33</span></div>
+        <div class="lambda">ТЫ (Λ)<span class="v" id="v-lambda">0.34</span></div>
+      </div>
+      <div id="dev-bar"></div>
+      <div id="dev-label">
+        <span>δ = <b id="v-dev">0.000</b></span>
+        <span id="v-dev-state">Γ держит</span>
+      </div>
+    </div>
+
+    <div class="panel" id="p-mode">
+      <h3>Дом MONOMOD · 5 модов</h3>
+      <div id="modes-row">
+        <button data-mode="monolog">МОНОЛОГ</button>
+        <button data-mode="dimod">DIMOD</button>
+        <button data-mode="multimod">MULTIMOD</button>
+        <button data-mode="dialog" class="active">ДИАЛОГ</button>
+        <button data-mode="polilog">ПОЛИЛОГ</button>
+      </div>
+      <div id="mode-desc"><b>ДИАЛОГ</b> — идеальный баланс 1:1:1. Режим по умолчанию.</div>
+      <div id="mode-flows">
+        <span>Ψ <b id="mf-psi">0.50</b></span>
+        <span>Ω <b id="mf-omega">0.50</b></span>
+        <span>Λ <b id="mf-lambda">0.50</b></span>
+        <span>Γ <b id="mf-gamma">0.50</b></span>
+      </div>
+    </div>
+
+    <div class="panel" id="p-gradient">
+      <h3>∇n · градиент покоя</h3>
+      <div id="gradient-row">
+        <input type="range" id="sl-nabla" min="0" max="100" value="0" step="1">
+        <span class="val" id="v-nabla">0.00</span>
+      </div>
+      <div id="gradient-info">
+        ёмкость буфера = базовая × (1 + ∇n)<br>
+        при ∇n &gt; 0.8 · P11 (Q) активен<br>
+        при ∇n = 1.0 · reset:full
+      </div>
+    </div>
+
+    <div class="panel" id="p-core">
+      <h3>K₁ / K₂ / K₃ · ядро</h3>
+      <div id="core-row">
+        <span class="key">K₁ commit</span><span class="val" id="k1">—</span>
+        <span class="key">K₂ energy</span><span class="val" id="k2">110.347</span>
+        <span class="key">K₃ hash</span><span class="val" id="k3">rqlmhwgt</span>
+        <span class="key">Σp</span><span class="val" id="sum-p">16.500</span>
+        <span class="key">p10</span><span class="val" id="p10">1.347</span>
+      </div>
+    </div>
+
+    <div class="panel" id="p-git">
+      <h3>GIT4 · ветки и коммиты</h3>
+      <div id="git-branch"></div>
+      <div id="git-status">
+        HEAD: <b id="git-head">—</b> · коммитов: <b id="git-count">0</b>
+      </div>
+      <div id="git-actions">
+        <button id="git-branch-new" class="purple">⎇ ветка</button>
+        <button id="git-checkout" class="cool">↷ checkout</button>
+        <button id="git-merge" class="hot">⎈ merge</button>
+        <button id="git-diff" class="warn">⇄ diff</button>
+        <button id="git-log" class="cool">☰ log</button>
+        <button id="git-reset" class="hot">↺ HEAD~1</button>
+      </div>
+    </div>
+
+    <div class="panel" id="p-cycle">
+      <h3>7-тактный цикл</h3>
+      <div id="cycle-row">
+        <div class="phase" data-phase="0">метка</div>
+        <div class="phase" data-phase="1">collect</div>
+        <div class="phase" data-phase="2">link</div>
+        <div class="phase" data-phase="3">P1..P4</div>
+        <div class="phase" data-phase="4">pack</div>
+        <div class="phase" data-phase="5">unpack</div>
+        <div class="phase" data-phase="6">apply</div>
+      </div>
+      <div id="cycle-status">такт <b>0</b> из 7 · сбор сигнала</div>
+    </div>
+
+    <div class="panel" id="p-dims">
+      <h3>5 мерностей · слой</h3>
+      <div id="dims-row">
+        <button data-dim="0" class="active">все</button>
+        <button data-dim="1">1D</button>
+        <button data-dim="2">2D</button>
+        <button data-dim="3">3D</button>
+        <button data-dim="4">4D</button>
+        <button data-dim="5">5D</button>
+      </div>
+      <div id="dim-desc">видны все 26 нейронов</div>
+    </div>
+
+    <div class="panel" id="p-agents">
+      <h3>7 агентов</h3>
+      <div id="agents-list"></div>
+    </div>
+
+    <div class="panel" id="p-flows">
+      <h3>потоки триады</h3>
+      <div id="flows">
+        <div class="flow-row">
+          <div class="badge psi"></div>
+          <div class="name">Ψ (Я)<small>P1 · генерация</small></div>
+          <span class="pos" id="pos-psi">0.0</span>
+        </div>
+        <div class="flow-row">
+          <div class="badge omega"></div>
+          <div class="name">Ω (ОНИ)<small>P3/P6 · проверка</small></div>
+          <span class="pos" id="pos-omega">8.0</span>
+        </div>
+        <div class="flow-row">
+          <div class="badge lambda"></div>
+          <div class="name">Λ (ТЫ)<small>P7/P9 · разрыв</small></div>
+          <span class="pos" id="pos-lambda">16.0</span>
+        </div>
+        <div class="flow-row">
+          <div class="badge gamma"></div>
+          <div class="name">Γ (Клепа)<small>P4/P8 · перераспр.</small></div>
+          <span class="pos" id="pos-gamma">22.0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="p-sliders">
+      <h3>ползунки</h3>
+      <div class="slider-row psi">
+        <label>Ψ (Я)</label>
+        <input type="range" id="sl-psi" min="1" max="20" value="5" step="1">
+        <span class="val" id="v-psi-speed">0.050</span>
+      </div>
+      <div class="slider-row omega">
+        <label>Ω (ОНИ)</label>
+        <input type="range" id="sl-omega" min="1" max="20" value="4" step="1">
+        <span class="val" id="v-omega-speed">0.040</span>
+      </div>
+      <div class="slider-row lambda">
+        <label>Λ (ТЫ)</label>
+        <input type="range" id="sl-lambda" min="1" max="20" value="5" step="1">
+        <span class="val" id="v-lambda-speed">0.050</span>
+      </div>
+      <div class="slider-row gamma">
+        <label>Γ (Клепа)</label>
+        <input type="range" id="sl-gamma" min="1" max="20" value="4" step="1">
+        <span class="val" id="v-gamma-speed">0.040</span>
+      </div>
+      <div class="slider-row">
+        <label>k коррекц.</label>
+        <input type="range" id="sl-k" min="1" max="20" value="5" step="1">
+        <span class="val" id="v-k">0.50</span>
+      </div>
+      <div class="slider-row">
+        <label>длина такта</label>
+        <input type="range" id="sl-tick" min="10" max="180" value="60" step="10">
+        <span class="val" id="v-tick">60</span>
+      </div>
+    </div>
+
+    <div class="panel" id="p-syn">
+      <h3>синапсы</h3>
+      <div id="syn-stats">
+        <span>всего</span><span id="s-total">0</span>
+        <span>сильных</span><span id="s-strong">0</span>
+        <span>слабых</span><span id="s-weak">0</span>
+        <span>погасших</span><span id="s-dead">0</span>
+        <span>перестроек</span><span id="s-rewires">0</span>
+        <span>LINK-опер.</span><span id="s-links">0</span>
+      </div>
+    </div>
+
+    <div class="panel" id="log-panel" style="flex:1;">
+      <h3>события</h3>
+      <div id="log"></div>
+    </div>
+
+  </div>
+
+  <div id="input-row">
+    <input id="q" placeholder="слово — сдвинет оси ближайшего к Ψ нейрона..." autocomplete="off">
+    <button id="send">→</button>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+
+// ═══════════════════════════════════════════════
+// КОНСТАНТЫ
+// ═══════════════════════════════════════════════
+const AXES = [
+  { id: 'val', name: 'валент' },
+  { id: 'age', name: 'агент' },
+  { id: 'cer', name: 'увер' },
+  { id: 'rel', name: 'связь' },
+  { id: 'tim', name: 'время' },
+  { id: 'dep', name: 'глубина' },
+  { id: 'bri', name: 'яркость' },
+  { id: 'wgt', name: 'вес' },
+  { id: 'mot', name: 'движение' },
+  { id: 'bnd', name: 'граница' },
+  { id: 'mod', name: 'модаль' },
+  { id: 'att', name: 'внимание' },
+];
+
+const DIMS = {
+  1: { name: '1D', full: '1D · точка', color: '#4ac9ff', letters: ['A','K','N','Y'] },
+  2: { name: '2D', full: '2D · плоскость', color: '#4aff9a', letters: ['C','E','L','T','U','V'] },
+  3: { name: '3D', full: '3D · объём', color: '#ffb84a', letters: ['J','M','O','S'] },
+  4: { name: '4D', full: '4D · время', color: '#ff6a9a', letters: ['I','P','Q','W','X'] },
+  5: { name: '5D', full: '5D · сознание', color: '#c8a4ff', letters: ['B','D','F','G','H','R','Z'] },
+};
+
+const LETTER_DIM = {};
+Object.entries(DIMS).forEach(([dim, d]) => {
+  d.letters.forEach(L => { LETTER_DIM[L] = +dim; });
+});
+
+const AGENTS = [
+  { id: 'KLP-001', name: 'Клепа',     gen: 'klp',  letters: ['Y','A','Z'], role: 'якорь · держит систему', active: true },
+  { id: 'AG-001',  name: 'связь',     gen: 'gen1', letters: ['C'],         role: 'движение · приём',       active: true },
+  { id: 'AG-002',  name: 'проверка',  gen: 'gen1', letters: ['D'],         role: 'наблюдение · анализ',    active: true },
+  { id: 'AG-003',  name: 'адаптация', gen: 'gen2', letters: ['I'],         role: 'обучение',               active: true },
+  { id: 'AG-004',  name: 'синтез',    gen: 'gen2', letters: ['S'],         role: 'предсказание',           active: true },
+  { id: 'AG-005',  name: 'траектория',gen: 'gen3', letters: ['P'],         role: 'координация',            active: true },
+  { id: 'AG-006',  name: 'интеграция',gen: 'gen3', letters: ['Z'],         role: 'упреждение · синтез',    active: true },
+];
+
+const LETTER_AGENT = {};
+AGENTS.forEach(a => {
+  a.letters.forEach(L => { LETTER_AGENT[L] = a; });
+});
+
+const NEURON_NAMES = [
+  'свет','глубина','связь','декодер','край','пустота','вес','инерция',
+  'след','junction','кипение','липкость','двойник','ноль','обертон','путь',
+  'вопрос','резонанс','система','тепло','усталость','влага','волна','хрупкость',
+  'якорь','зенит'
+];
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const BLIND_ZONES = ['F', 'N', 'V'];
+const Y_MAX = 351;
+
+const NEURONS = LETTERS.map((l, i) => {
+  const xIdx = i + 1;
+  const yTri = xIdx * (xIdx + 1) / 2;
+  return {
+    l,
+    name: NEURON_NAMES[i],
+    x: 0.05 + (xIdx / 26) * 0.9,
+    y: 0.05 + (yTri / Y_MAX) * 0.9,
+    isBlind: BLIND_ZONES.includes(l),
+  };
+});
+
+const N = NEURONS.length;
+const N_IDX = {};
+NEURONS.forEach((n, i) => { N_IDX[n.l] = i; });
+
+const DEFAULT_AXES = {
+  A: [ 0, +1,  0,  0,  0,  0,  0,  0,  0,  0,  0, +1],
+  B: [ 0,  0, +1,  0,  0, +1,  0,  0,  0,  0,  0,  0],
+  C: [ 0,  0,  0, +1,  0,  0,  0,  0,  0,  0, +1,  0],
+  D: [ 0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0, +1],
+  E: [ 0,  0,  0,  0,  0,  0,  0,  0,  0, +1,  0,  0],
+  F: [-1,  0,  0,  0,  0,  0,  0,  0,  0, +1,  0,  0],
+  G: [ 0,  0,  0,  0,  0,  0,  0, +1, -1,  0,  0,  0],
+  H: [ 0,  0,  0,  0,  0,  0,  0, +1, -1,  0,  0,  0],
+  I: [ 0,  0,  0,  0, -1,  0,  0,  0,  0,  0,  0,  0],
+  J: [ 0,  0,  0, +1,  0,  0,  0,  0,  0, +1,  0,  0],
+  K: [ 0, +1,  0,  0,  0,  0,  0,  0, +1,  0,  0,  0],
+  L: [ 0,  0,  0, +1,  0,  0,  0,  0, -1,  0,  0,  0],
+  M: [ 0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0, +1],
+  N: [ 0,  0,  0,  0,  0,  0,  0,  0, -1,  0,  0, -1],
+  O: [ 0,  0,  0,  0,  0,  0, +1,  0,  0,  0,  0, +1],
+  P: [ 0,  0,  0,  0, +1,  0,  0,  0, +1,  0,  0,  0],
+  Q: [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0, +1, +1],
+  R: [ 0,  0,  0, +1,  0,  0,  0,  0,  0,  0,  0, +1],
+  S: [ 0,  0, +1,  0,  0, +1,  0,  0,  0,  0,  0,  0],
+  T: [+1,  0,  0, +1,  0,  0,  0,  0,  0,  0,  0,  0],
+  U: [ 0,  0,  0,  0,  0,  0, -1,  0, -1,  0,  0,  0],
+  V: [ 0,  0,  0,  0,  0,  0,  0,  0, +1, +1,  0,  0],
+  W: [ 0,  0,  0,  0, +1,  0,  0,  0, +1,  0,  0,  0],
+  X: [ 0,  0, -1,  0,  0,  0,  0,  0,  0, +1,  0,  0],
+  Y: [ 0,  0, +1,  0,  0,  0,  0,  0, -1,  0,  0,  0],
+  Z: [ 0,  0, +1,  0,  0, +1,  0,  0,  0,  0,  0,  0],
+};
+
+const BASE_SYNAPSES = [
+  ['A','B'], ['A','Y'], ['A','Z'], ['B','C'], ['B','G'],
+  ['C','D'], ['C','M'], ['D','E'], ['D','F'], ['E','F'],
+  ['E','X'], ['F','G'], ['G','H'], ['G','Z'], ['H','I'],
+  ['I','J'], ['I','W'], ['J','K'], ['K','L'], ['K','A'],
+  ['L','M'], ['M','N'], ['M','Y'], ['N','O'], ['O','P'],
+  ['P','Q'], ['Q','R'], ['R','S'], ['S','T'], ['T','U'],
+  ['U','V'], ['V','W'], ['W','X'], ['X','Y'], ['Y','Z'],
+];
+
+const CORE_SYNAPSES = [['Y','A'], ['A','Z'], ['Y','Z']];
+const CORE_HASH = 'rqlmhwgt';
+const BASE_CORE_ENERGY = 110.347;
+
+// ═══════════════════════════════════════════════
+// СОСТОЯНИЕ
+// ═══════════════════════════════════════════════
+let NEURON_AXES = JSON.parse(JSON.stringify(DEFAULT_AXES));
+let synapses = [];
+
+function initSynapses(selective) {
+  if (!selective || synapses.length === 0) {
+    synapses = [];
+    for (let i = 0; i < N; i++) {
+      synapses[i] = [];
+      for (let j = 0; j < N; j++) {
+        synapses[i][j] = { weight: 0, lastUsed: 0, uses: 0 };
+      }
+    }
+  }
+  const isCore = (a, b) => CORE_SYNAPSES.some(([x, y]) =>
+    (a === x && b === y) || (a === y && b === x));
+  BASE_SYNAPSES.forEach(([a, b]) => {
+    if (selective && isCore(a, b)) return;
+    const i = N_IDX[a], j = N_IDX[b];
+    if (i === undefined || j === undefined) return;
+    synapses[i][j].weight = Math.max(synapses[i][j].weight, 0.55);
+    synapses[j][i].weight = Math.max(synapses[j][i].weight, 0.40);
+  });
+  CORE_SYNAPSES.forEach(([a, b]) => {
+    const i = N_IDX[a], j = N_IDX[b];
+    if (i === undefined || j === undefined) return;
+    synapses[i][j].weight = Math.max(synapses[i][j].weight, 0.7);
+    synapses[j][i].weight = Math.max(synapses[j][i].weight, 0.5);
+  });
+}
+
+const params = {
+  decay: 0.0006,
+  strength: 0.005,
+  k: 0.5,
+  tickLen: 60,
+  nabla: 0,
+};
+
+const flows = {
+  psi:    { id:'psi',    pos: 0,  speed: 0.050, active: true, color:'#e8c39e' },
+  omega:  { id:'omega',  pos: 8,  speed: 0.040, active: true, color:'#7aa2ff' },
+  lambda: { id:'lambda', pos: 16, speed: 0.050, active: true, color:'#ffa840' },
+  gamma:  { id:'gamma',  pos: 22, speed: 0.040, active: true, color:'#8fd8b8' },
+};
+
+let triad = { omega: 1/3, psi: 1/3, lambda: 1/3 };
+const flashes = [];
+const stats = { thoughts: 0, words: 0, rewires: 0, laps: 0, flashes: 0, links: 0 };
+
+let tick = 0;
+let running = true;
+let startTime = performance.now();
+
+let cyclePhase = 0;
+let cycleTick = 0;
+const CYCLE_PHASES = [
+  { id: 0, name: 'метка',    desc: 'сбор сигнала' },
+  { id: 1, name: 'collect',  desc: 'накопление · Ψ' },
+  { id: 2, name: 'link',     desc: 'связывание · Ψ+Ω' },
+  { id: 3, name: 'P1..P4',   desc: 'обработка · все' },
+  { id: 4, name: 'pack',     desc: 'сжатие · Λ' },
+  { id: 5, name: 'unpack',   desc: 'разворот · Γ' },
+  { id: 6, name: 'apply',    desc: 'применение · Γ' },
+];
+
+let resetMode = 'selective';
+let hoveredNeuronIdx = -1;
+let pinnedNeuronIdx = -1;
+let highlightAgentIdx = -1;
+let currentDim = 0;
+let dim26Letter = null;
+
+// ядро K₁ K₂ K₃
+let coreEnergy = BASE_CORE_ENERGY;
+let coreK1Commit = '—';
+
+// ∇n и моды
+const MODES = {
+  monolog:  { name: 'МОНОЛОГ',  flows: { psi: 1.0, omega: 0.2, lambda: 0.2, gamma: 0.2 },
+              desc: '<b>МОНОЛОГ</b> — доминирование генерации. Риск солипсизма.' },
+  dimod:    { name: 'DIMOD',    flows: { psi: 0.6, omega: 0.6, lambda: 0.4, gamma: 0.4 },
+              desc: '<b>DIMOD</b> — бинарная проверка. Диалог с системой.' },
+  multimod: { name: 'MULTIMOD', flows: { psi: 0.5, omega: 0.5, lambda: 0.5, gamma: 0.8 },
+              desc: '<b>MULTIMOD</b> — высокая связность. Сложная обработка.' },
+  dialog:   { name: 'ДИАЛОГ',   flows: { psi: 0.5, omega: 0.5, lambda: 0.5, gamma: 0.5 },
+              desc: '<b>ДИАЛОГ</b> — идеальный баланс 1:1:1. Режим по умолчанию.' },
+  polilog:  { name: 'ПОЛИЛОГ',  flows: { psi: 0.3, omega: 0.8, lambda: 0.8, gamma: 0.9 },
+              desc: '<b>ПОЛИЛОГ</b> — анализ внешнего хаоса. Максимальная защита.' },
+};
+let currentMode = 'dialog';
+
+// ═══════════════════════════════════════════════
+// УТИЛИТЫ
+// ═══════════════════════════════════════════════
+function nearestNeuron(pos) {
+  const i0 = ((Math.floor(pos) % N) + N) % N;
+  const i1 = (i0 + 1) % N;
+  const t = pos - Math.floor(pos);
+  return [{ i: i0, w: 1 - t }, { i: i1, w: t }];
+}
+
+function axisPower(letter) {
+  const axes = NEURON_AXES[letter] || [];
+  let s = 0;
+  for (const v of axes) s += Math.abs(v);
+  return 1 + s * 0.08;
+}
+
+function agentBoost(letter) {
+  const a = LETTER_AGENT[letter];
+  if (!a || !a.active) return 1.0;
+  return 1.5;
+}
+
+function dimVisible(letter) {
+  if (currentDim === 0) return true;
+  return LETTER_DIM[letter] === currentDim;
+}
+
+// ═══════════════════════════════════════════════
+// 26D-РАЗВЁРТКА
+// ═══════════════════════════════════════════════
+function unfold26D(letter) {
+  const idx = N_IDX[letter];
+  if (idx === undefined) return new Array(26).fill(0);
+  const v = new Array(26).fill(0);
+  const axes = NEURON_AXES[letter] || new Array(12).fill(0);
+  const selfAxes = axes.reduce((s, x) => s + Math.abs(x), 0) / 12;
+  for (let j = 0; j < N; j++) {
+    if (j === idx) { v[j] = Math.min(9, Math.round(selfAxes * 9)); continue; }
+    let val = Math.max(synapses[idx][j].weight, synapses[j][idx].weight);
+    if (LETTER_DIM[letter] && LETTER_DIM[NEURONS[j].l] === LETTER_DIM[letter]) val *= 1.3;
+    if (LETTER_AGENT[letter] && LETTER_AGENT[NEURONS[j].l] === LETTER_AGENT[letter]) val *= 1.4;
+    if (NEURONS[j].isBlind) val *= 0.7;
+    v[j] = Math.min(9, Math.round(val * 9));
+  }
+  return v;
+}
+
+function showDim26(letter) {
+  dim26Letter = letter;
+  const card = $('dim26-card');
+  if (!card) return;
+  card.classList.add('show');
+  const n = NEURONS[N_IDX[letter]];
+  const v = unfold26D(letter);
+  const dim = LETTER_DIM[letter];
+  const dimInfo = dim ? DIMS[dim] : null;
+  const agent = LETTER_AGENT[letter];
+  $('dim26-title').textContent = `26D · ${letter} · ${n.name}`;
+  let desc = `Проекция 2D → 26D. Оси — буквы A..Z. Значения 0..9.`;
+  if (dimInfo) desc += ` Мерность: ${dimInfo.full}.`;
+  if (agent) desc += ` Агент: ${agent.id}.`;
+  $('dim26-desc').textContent = desc;
+  let html = '';
+  for (let j = 0; j < N; j++) {
+    const val = v[j];
+    const barW = (val / 9) * 100;
+    let color = '#4ac9ff';
+    if (val > 6) color = '#ff6a9a';
+    else if (val > 4) color = '#c8a4ff';
+    else if (val > 2) color = '#4aff9a';
+    html += `<div class="letter">${NEURONS[j].l}</div>`;
+    html += `<div class="bar"><span style="width:${barW}%; background:${color};"></span></div>`;
+    html += `<div class="v">${val}</div>`;
+  }
+  $('dim26-grid').innerHTML = html;
+}
+
+function closeDim26() {
+  dim26Letter = null;
+  const card = $('dim26-card');
+  if (card) card.classList.remove('show');
+}
+
+// ═══════════════════════════════════════════════
+// 26×26 HEATMAP
+// ═══════════════════════════════════════════════
+function showHeatmap() {
+  const card = $('heatmap-card');
+  if (!card) return;
+  card.classList.add('show');
+
+  let maxW = 0, maxPair = '—';
+  for (let i = 0; i < N; i++) {
+    for (let j = i + 1; j < N; j++) {
+      const w = Math.max(synapses[i][j].weight, synapses[j][i].weight);
+      if (w > maxW) { maxW = w; maxPair = NEURONS[i].l + '↔' + NEURONS[j].l; }
+    }
+  }
+
+  $('hm-desc').textContent =
+    `Матрица 26×26. Строки и столбцы — буквы A..Z. ` +
+    `Значение в ячейке = вес синапса (0..1). ` +
+    `Клик по ячейке → 26D-развёртка буквы строки. ` +
+    `Диагональ пустая.`;
+
+  let html = '<div class="label"></div>';
+  for (let j = 0; j < N; j++) {
+    html += `<div class="label">${NEURONS[j].l}</div>`;
+  }
+  for (let i = 0; i < N; i++) {
+    html += `<div class="label">${NEURONS[i].l}</div>`;
+    for (let j = 0; j < N; j++) {
+      if (i === j) {
+        html += `<div class="cell" style="background:#05050a;"></div>`;
+        continue;
+      }
+      const w = Math.max(synapses[i][j].weight, synapses[j][i].weight);
+      // цвет по весу: 0=тёмно-синий, 1=ярко-розовый
+      let r, g, b;
+      if (w > 0.7) { r = 255; g = 106; b = 154; }
+      else if (w > 0.4) { r = 200; g = 140; b = 255; }
+      else if (w > 0.1) { r = 100; g = 140; b = 200; }
+      else { r = 30; g = 30; b = 50; }
+      const alpha = 0.3 + w * 0.7;
+      html += `<div class="cell" data-i="${i}" data-j="${j}" ` +
+              `style="background:rgba(${r},${g},${b},${alpha});" ` +
+              `title="${NEURONS[i].l}↔${NEURONS[j].l} = ${w.toFixed(3)}"></div>`;
+    }
+  }
+  $('hm-grid').innerHTML = html;
+  $('hm-max-info').textContent = `max = ${maxW.toFixed(3)} (${maxPair})`;
+
+  $('hm-grid').querySelectorAll('.cell').forEach(el => {
+    el.addEventListener('click', () => {
+      const i = +el.dataset.i;
+      showDim26(NEURONS[i].l);
+    });
+  });
+}
+
+function closeHeatmap() {
+  const card = $('heatmap-card');
+  if (card) card.classList.remove('show');
+}
+
+// ═══════════════════════════════════════════════
+// GIT4 · МНОЖЕСТВЕННЫЕ ВЕТКИ
+// ═══════════════════════════════════════════════
+let git = {
+  branches: {
+    'HOME3': { commits: [], head: null, parentBranch: null },
+  },
+  currentBranch: 'HOME3',
+  counter: 0,
+};
+
+function snapshot() {
+  return {
+    synapses: synapses.map(row => row.map(s => ({
+      weight: +s.weight.toFixed(4),
+      uses: s.uses,
+    }))),
+    axes: JSON.parse(JSON.stringify(NEURON_AXES)),
+    agents: AGENTS.map(a => ({ id: a.id, active: a.active })),
+    triad: { psi: triad.psi, omega: triad.omega, lambda: triad.lambda },
+    flows: {
+      psi: flows.psi.pos, omega: flows.omega.pos,
+      lambda: flows.lambda.pos, gamma: flows.gamma.pos,
+    },
+    cycle: cyclePhase,
+    dim: currentDim,
+    mode: currentMode,
+    nabla: params.nabla,
+    coreEnergy: coreEnergy,
+  };
+}
+
+function restoreSnapshot(s) {
+  if (!s) return;
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      if (s.synapses[i] && s.synapses[i][j]) {
+        synapses[i][j].weight = s.synapses[i][j].weight;
+        synapses[i][j].uses = s.synapses[i][j].uses || 0;
+      }
+    }
+  }
+  if (s.axes) NEURON_AXES = JSON.parse(JSON.stringify(s.axes));
+  if (s.agents) {
+    s.agents.forEach(ag => {
+      const a = AGENTS.find(x => x.id === ag.id);
+      if (a) a.active = ag.active;
+    });
+  }
+  if (s.triad) triad = { ...s.triad };
+  if (s.flows) {
+    flows.psi.pos = s.flows.psi;
+    flows.omega.pos = s.flows.omega;
+    flows.lambda.pos = s.flows.lambda;
+    flows.gamma.pos = s.flows.gamma;
+  }
+  if (typeof s.cycle === 'number') cyclePhase = s.cycle;
+  if (typeof s.dim === 'number') {
+    currentDim = s.dim;
+    document.querySelectorAll('#dims-row button').forEach(x => {
+      x.classList.toggle('active', +x.dataset.dim === currentDim);
+    });
+  }
+  if (s.mode) setMode(s.mode, true);
+  if (typeof s.nabla === 'number') {
+    params.nabla = s.nabla;
+    const sl = $('sl-nabla');
+    if (sl) sl.value = Math.round(s.nabla * 100);
+    const vn = $('v-nabla');
+    if (vn) vn.textContent = s.nabla.toFixed(2);
+    const hn = $('h-nabla');
+    if (hn) hn.textContent = s.nabla.toFixed(2);
+  }
+  if (typeof s.coreEnergy === 'number') coreEnergy = s.coreEnergy;
+}
+
+function hashSnapshot() {
+  let h = 2166136261;
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      const w = synapses[i][j].weight;
+      if (w > 0.05) {
+        const x = Math.round(w * 100);
+        h ^= (i * 31 + j) ^ x;
+        h = Math.imul(h, 16777619);
+      }
+    }
+  }
+  return (h >>> 0).toString(36).slice(0, 7);
+}
+
+function commit(msg) {
+  const branch = git.branches[git.currentBranch];
+  const snap = snapshot();
+  const hash = hashSnapshot();
+  const id = 'c' + (++git.counter);
+  const time = new Date().toTimeString().slice(0, 8);
+  branch.commits.push({
+    id, hash, msg: msg || 'коммит',
+    time, snapshot: snap,
+    parent: branch.head,
+  });
+  branch.head = id;
+  coreK1Commit = hash;
+  renderGit();
+  log(`GIT4 · [${git.currentBranch}] ${hash} · ${msg || 'коммит'}`, 'ok');
+  return { id, hash };
+}
+
+function branchReset(name) {
+  const newName = name || ('HOME3-' + Math.floor(Math.random() * 1000));
+  const snap = snapshot();
+  const hash = hashSnapshot();
+  git.branches[newName] = {
+    commits: [{
+      id: 'c' + (++git.counter), hash, msg: 'старт ветки',
+      time: new Date().toTimeString().slice(0, 8),
+      snapshot: snap, parent: null,
+    }],
+    head: 'c' + git.counter,
+    parentBranch: git.currentBranch,
+  };
+  git.currentBranch = newName;
+  renderGit();
+  log(`GIT4 · создана ветка ${newName} от ${git.branches[newName].parentBranch}`, 'warn');
+}
+
+function switchBranch(name) {
+  if (!git.branches[name]) return;
+  git.currentBranch = name;
+  const branch = git.branches[name];
+  const head = branch.commits.find(c => c.id === branch.head);
+  if (head) restoreSnapshot(head.snapshot);
+  renderGit();
+  log(`GIT4 · переключено на ветку ${name}`, 'cool');
+}
+
+function checkoutCommit(id) {
+  const branch = git.branches[git.currentBranch];
+  const c = branch.commits.find(x => x.id === id);
+  if (!c) return;
+  restoreSnapshot(c.snapshot);
+  branch.head = id;
+  renderGit();
+  log(`GIT4 · checkout ${c.hash} · ${c.msg}`, 'cool');
+}
+
+function renderGit() {
+  const branchEl = $('git-branch');
+  if (!branchEl) return;
+
+  let html = '';
+  const current = git.branches[git.currentBranch];
+  html += `<div style="color:#4aff9a;font-size:10px;margin-bottom:4px;">◉ ${git.currentBranch}</div>`;
+
+  // список коммитов текущей ветки
+  current.commits.slice().reverse().forEach(c => {
+    const isHead = c.id === current.head;
+    html += `<div class="commit ${isHead ? 'head' : ''}" data-id="${c.id}">
+      <span class="hash">${c.hash}</span>
+      <span class="msg">${c.msg}<small>${c.time}</small></span>
+      <span class="time">${isHead ? 'HEAD' : ''}</span>
+    </div>`;
+  });
+
+  // другие ветки
+  const others = Object.keys(git.branches).filter(b => b !== git.currentBranch);
+  if (others.length) {
+    html += `<div style="margin-top:8px;color:#6b6b80;font-size:10px;">другие ветки:</div>`;
+    others.forEach(name => {
+      const b = git.branches[name];
+      const headCommit = b.commits.find(c => c.id === b.head);
+      html += `<div class="commit branch-other" data-branch="${name}">
+        <span class="hash">⎇</span>
+        <span class="msg">${name}<small>${headCommit ? headCommit.msg : '—'}</small></span>
+        <span class="time">${b.commits.length}</span>
+      </div>`;
+    });
+  }
+
+  branchEl.innerHTML = html;
+
+  branchEl.querySelectorAll('.commit[data-id]').forEach(el => {
+    el.addEventListener('click', () => checkoutCommit(el.dataset.id));
+  });
+  branchEl.querySelectorAll('.commit[data-branch]').forEach(el => {
+    el.addEventListener('click', () => switchBranch(el.dataset.branch));
+  });
+
+  safeSet('h-branch', git.currentBranch);
+  safeSet('h-head', current.head || '—');
+  safeSet('git-head', current.head || '—');
+  safeSet('git-count', current.commits.length);
+  safeSet('k1', coreK1Commit);
+  safeSet('k2', coreEnergy.toFixed(3));
+  safeSet('k3', CORE_HASH);
+  safeSet('h-core-energy', coreEnergy.toFixed(3));
+}
+
+// ═══════════════════════════════════════════════
+// DIFF МЕЖДУ КОММИТАМИ
+// ═══════════════════════════════════════════════
+function computeDiff(snapA, snapB) {
+  const edgeDiffs = [];
+  for (let i = 0; i < N; i++) {
+    for (let j = i + 1; j < N; j++) {
+      const wA = Math.max(snapA.synapses[i][j].weight, snapA.synapses[j][i].weight);
+      const wB = Math.max(snapB.synapses[i][j].weight, snapB.synapses[j][i].weight);
+      const d = wB - wA;
+      if (Math.abs(d) > 0.02) {
+        edgeDiffs.push({
+          i, j, from: NEURONS[i].l, to: NEURONS[j].l,
+          wA, wB, delta: d,
+        });
+      }
+    }
+  }
+  edgeDiffs.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+
+  const axisDiffs = [];
+  for (const L in snapA.axes) {
+    const aA = snapA.axes[L];
+    const aB = snapB.axes[L];
+    for (let k = 0; k < 12; k++) {
+      const d = aB[k] - aA[k];
+      if (Math.abs(d) > 0.05) {
+        axisDiffs.push({ L, axis: AXES[k].name, idx: k, from: aA[k], to: aB[k], delta: d });
+      }
+    }
+  }
+  axisDiffs.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+
+  // агенты
+  const agentDiffs = [];
+  for (let k = 0; k < snapA.agents.length; k++) {
+    if (snapA.agents[k].active !== snapB.agents[k].active) {
+      agentDiffs.push({
+        id: snapA.agents[k].id,
+        from: snapA.agents[k].active,
+        to: snapB.agents[k].active,
+      });
+    }
+  }
+
+  // триада
+  const triadDelta = {
+    psi: snapB.triad.psi - snapA.triad.psi,
+    omega: snapB.triad.omega - snapA.triad.omega,
+    lambda: snapB.triad.lambda - snapA.triad.lambda,
+  };
+
+  return { edgeDiffs, axisDiffs, agentDiffs, triadDelta };
+}
+
+function showDiff() {
+  const branch = git.branches[git.currentBranch];
+  if (branch.commits.length < 2) {
+    log('GIT4 · нужно минимум 2 коммита для diff', 'warn');
+    return;
+  }
+  const a = branch.commits[branch.commits.length - 2];
+  const b = branch.commits[branch.commits.length - 1];
+  const diff = computeDiff(a.snapshot, b.snapshot);
+
+  const card = $('diff-card');
+  card.classList.add('show');
+
+  $('diff-title').textContent = `Diff · ${a.hash} → ${b.hash}`;
+
+  $('diff-meta').innerHTML =
+    `<b>${a.hash}</b> (${a.time}) → <b>${b.hash}</b> (${b.time})<br>` +
+    `ветка: <b>${git.currentBranch}</b><br>` +
+    `синапсы: <b>${diff.edgeDiffs.length}</b> изменений · ` +
+    `оси: <b>${diff.axisDiffs.length}</b> · ` +
+    `агенты: <b>${diff.agentDiffs.length}</b>`;
+
+  let html = '';
+
+  // синапсы
+  if (diff.edgeDiffs.length > 0) {
+    html += `<div class="section"><h5>синапсы (топ ${Math.min(15, diff.edgeDiffs.length)})</h5>`;
+    diff.edgeDiffs.slice(0, 15).forEach(e => {
+      const cls = e.delta > 0 ? 'plus' : 'minus';
+      const arrow = e.delta > 0 ? '↑' : '↓';
+      const sign = e.delta > 0 ? '+' : '';
+      html += `<div class="edge">
+        <span>${e.from}↔${e.to}</span>
+        <span class="${cls}">${sign}${e.delta.toFixed(2)}</span>
+        <span class="arrow">${arrow}</span>
+        <div class="bar"><span style="width:${Math.abs(e.delta) * 100}%; background:${e.delta > 0 ? '#4aff9a' : '#ff6a9a'};"></span></div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // оси
+  if (diff.axisDiffs.length > 0) {
+    html += `<div class="section"><h5>оси (топ ${Math.min(15, diff.axisDiffs.length)})</h5>`;
+    diff.axisDiffs.slice(0, 15).forEach(e => {
+      const cls = e.delta > 0 ? '' : 'neg';
+      const sign = e.delta > 0 ? '+' : '';
+      html += `<div class="axis-change">
+        <span class="l">${e.L}</span>
+        <span class="name">${e.axis}</span>
+        <span class="old">${e.from.toFixed(2)}</span>
+        <span class="arrow">→</span>
+        <span class="new">${e.to.toFixed(2)}</span>
+        <span class="delta ${cls}">${sign}${e.delta.toFixed(2)}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // агенты
+  if (diff.agentDiffs.length > 0) {
+    html += `<div class="section"><h5>агенты</h5>`;
+    diff.agentDiffs.forEach(e => {
+      html += `<div style="font-size:10px;color:#ffb84a;">${e.id}: ${e.from ? 'on' : 'off'} → ${e.to ? 'on' : 'off'}</div>`;
+    });
+    html += `</div>`;
+  }
+
+  // триада
+  html += `<div class="section"><h5>триада Δ</h5>
+    <div style="font-size:10.5px;color:#b8b8c8;line-height:1.7;">
+      Ψ: ${diff.triadDelta.psi > 0 ? '+' : ''}${diff.triadDelta.psi.toFixed(3)}<br>
+      Ω: ${diff.triadDelta.omega > 0 ? '+' : ''}${diff.triadDelta.omega.toFixed(3)}<br>
+      Λ: ${diff.triadDelta.lambda > 0 ? '+' : ''}${diff.triadDelta.lambda.toFixed(3)}
+    </div>
+  </div>`;
+
+  // сводка
+  const sumEdge = diff.edgeDiffs.reduce((s, e) => s + Math.abs(e.delta), 0);
+  const sumAxis = diff.axisDiffs.reduce((s, e) => s + Math.abs(e.delta), 0);
+  html += `<div class="summary">
+    Σ|Δ синапсов| = ${sumEdge.toFixed(3)}<br>
+    Σ|Δ осей| = ${sumAxis.toFixed(3)}<br>
+    ${sumEdge > 3 ? '⚠ сильная перестройка' : 'спокойное изменение'}
+  </div>`;
+
+  $('diff-body').innerHTML = html;
+  log(`GIT4 · diff ${a.hash}→${b.hash} · ${diff.edgeDiffs.length} синапсов, ${diff.axisDiffs.length} осей`, 'cool');
+}
+
+function closeDiff() {
+  const card = $('diff-card');
+  if (card) card.classList.remove('show');
+}
+
+// ═══════════════════════════════════════════════
+// MERGE ВЕТОК
+// ═══════════════════════════════════════════════
+let mergeState = {
+  aBranch: null,
+  bBranch: null,
+  strategy: 'weighted',
+  conflicts: [],
+};
+
+function showMerge() {
+  const names = Object.keys(git.branches);
+  if (names.length < 2) {
+    log('GIT4 · нужно 2+ ветки для merge', 'warn');
+    return;
+  }
+  mergeState.aBranch = git.currentBranch;
+  mergeState.bBranch = names.find(n => n !== git.currentBranch);
+
+  const card = $('merge-card');
+  card.classList.add('show');
+  renderMerge();
+}
+
+function renderMerge() {
+  const a = git.branches[mergeState.aBranch];
+  const b = git.branches[mergeState.bBranch];
+  if (!a || !b) return;
+
+  $('merge-branches').innerHTML = `
+    <div class="branch a">
+      <div class="name">${mergeState.aBranch}</div>
+      <div class="info">${a.commits.length} коммитов<br>HEAD: ${a.head || '—'}</div>
+    </div>
+    <div class="arrow">⊕</div>
+    <div class="branch b">
+      <div class="name">${mergeState.bBranch}</div>
+      <div class="info">${b.commits.length} коммитов<br>HEAD: ${b.head || '—'}</div>
+    </div>
+  `;
+
+  // считаем конфликты
+  const headA = a.commits.find(c => c.id === a.head);
+  const headB = b.commits.find(c => c.id === b.head);
+  if (!headA || !headB) return;
+
+  const conflicts = [];
+  for (let i = 0; i < N; i++) {
+    for (let j = i + 1; j < N; j++) {
+      const wA = Math.max(headA.snapshot.synapses[i][j].weight, headA.snapshot.synapses[j][i].weight);
+      const wB = Math.max(headB.snapshot.synapses[i][j].weight, headB.snapshot.synapses[j][i].weight);
+      if (Math.abs(wA - wB) > 0.15) {
+        conflicts.push({
+          i, j, from: NEURONS[i].l, to: NEURONS[j].l,
+          wA, wB,
+        });
+      }
+    }
+  }
+  mergeState.conflicts = conflicts;
+
+  $('merge-conflicts').innerHTML = conflicts.length === 0
+    ? '<b style="color:#4aff9a">конфликтов нет — чистый merge</b>'
+    : `<b>${conflicts.length} конфликтов</b> (разница > 0.15):<br>` +
+      conflicts.slice(0, 10).map(c =>
+        `<span class="edge">${c.from}↔${c.to}: A=${c.wA.toFixed(2)} B=${c.wB.toFixed(2)}</span>`
+      ).join('<br>') +
+      (conflicts.length > 10 ? `<br>...ещё ${conflicts.length - 10}` : '');
+}
+
+function applyMerge() {
+  const a = git.branches[mergeState.aBranch];
+  const b = git.branches[mergeState.bBranch];
+  const headA = a.commits.find(c => c.id === a.head);
+  const headB = b.commits.find(c => c.id === b.head);
+  if (!headA || !headB) return;
+
+  const merged = JSON.parse(JSON.stringify(headA.snapshot));
+
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      const wA = headA.snapshot.synapses[i][j].weight;
+      const wB = headB.snapshot.synapses[i][j].weight;
+      let w;
+      switch (mergeState.strategy) {
+        case 'ours': w = wA; break;
+        case 'theirs': w = wB; break;
+        case 'union': w = Math.max(wA, wB); break;
+        case 'weighted':
+        default: w = (wA * 0.5 + wB * 0.5); break;
+      }
+      merged.synapses[i][j].weight = w;
+    }
+  }
+
+  // оси — усредняем
+  for (const L in merged.axes) {
+    for (let k = 0; k < 12; k++) {
+      const aV = headA.snapshot.axes[L][k];
+      const bV = headB.snapshot.axes[L][k];
+      merged.axes[L][k] = (aV + bV) / 2;
+    }
+  }
+
+  restoreSnapshot(merged);
+
+  // фиксируем как новый коммит в текущей ветке
+  commit(`merge ${mergeState.bBranch} → ${mergeState.aBranch} (${mergeState.strategy})`);
+
+  log(`GIT4 · merge ${mergeState.aBranch} ⊕ ${mergeState.bBranch} · стратегия ${mergeState.strategy}`, 'ok');
+  closeMerge();
+}
+
+function closeMerge() {
+  const card = $('merge-card');
+  if (card) card.classList.remove('show');
+}
+
+// ═══════════════════════════════════════════════
+// ЭКСПОРТ / ИМПОРТ
+// ═══════════════════════════════════════════════
+function exportState() {
+  const data = {
+    version: 'GIT4.12',
+    exported: new Date().toISOString(),
+    snapshot: snapshot(),
+    git: {
+      branches: git.branches,
+      currentBranch: git.currentBranch,
+      counter: git.counter,
+    },
+    stats,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `brain-GIT4.12-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  log('состояние экспортировано', 'ok');
+}
+
+function importState(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const data = JSON.parse(r.result);
+      if (!data.snapshot) throw new Error('нет snapshot');
+      restoreSnapshot(data.snapshot);
+      if (data.git) {
+        git = {
+          branches: data.git.branches,
+          currentBranch: data.git.currentBranch,
+          counter: data.git.counter,
+        };
+      }
+      renderGit();
+      renderAgents();
+      log(`состояние импортировано · ${Object.keys(git.branches).length} веток`, 'ok');
+    } catch (e) {
+      log('ошибка импорта: ' + e.message, 'hot');
+    }
+  };
+  r.readAsText(file);
+}
+
+// ═══════════════════════════════════════════════
+// ПОТОКИ И ЦИКЛ
+// ═══════════════════════════════════════════════
+const PHASE_MULT = [
+  { psi: 1.5, omega: 0.5, lambda: 0.3, gamma: 0.5 },
+  { psi: 1.8, omega: 0.8, lambda: 0.3, gamma: 0.4 },
+  { psi: 1.2, omega: 1.2, lambda: 0.6, gamma: 0.7 },
+  { psi: 1.0, omega: 1.0, lambda: 1.0, gamma: 1.0 },
+  { psi: 0.6, omega: 1.0, lambda: 1.8, gamma: 0.8 },
+  { psi: 0.4, omega: 0.6, lambda: 1.0, gamma: 1.8 },
+  { psi: 0.5, omega: 0.7, lambda: 0.5, gamma: 2.0 },
+];
+
+function modeMult(key) {
+  const mode = MODES[currentMode];
+  return mode ? (mode.flows[key] || 0.5) : 0.5;
+}
+
+function stepFlow(flow, dt) {
+  if (!flow.active) return;
+  const phaseM = PHASE_MULT[cyclePhase][flow.id] || 1.0;
+  const modeM = modeMult(flow.id);
+  const nablaM = 1 + params.nabla * 0.5; // ∇n усиливает ёмкость
+  const speed = flow.speed * phaseM * modeM * nablaM;
+
+  flow.pos += speed * dt * 60;
+  if (flow.pos >= N) { flow.pos -= N; if (flow.id === 'psi') stats.laps++; }
+  if (flow.pos < 0) flow.pos += N;
+
+  const near = nearestNeuron(flow.pos);
+  near.forEach(({ i, w }) => {
+    if (w < 0.3) return;
+    const neuron = NEURONS[i];
+    const blindMod = neuron.isBlind ? 0.3 : 1.0;
+    const power = axisPower(neuron.l);
+    const boost = agentBoost(neuron.l);
+    const eff = w * blindMod * power * boost * phaseM * modeM;
+
+    if (flow.id === 'psi' || flow.id === 'omega') {
+      for (let j = 0; j < N; j++) {
+        if (i === j) continue;
+        const s = synapses[i][j];
+        if (s.weight > 0.05) {
+          // LINK-операция: усиливается в цикле link (фаза 2)
+          const linkBoost = cyclePhase === 2 ? 1.05 : 1.0;
+          s.weight = Math.min(1, s.weight + params.strength * eff * linkBoost);
+          s.lastUsed = performance.now();
+          s.uses++;
+          if (linkBoost > 1) stats.links++;
+          if (Math.random() < 0.12 * eff && s.weight > 0.2) {
+            flashes.push({ i, j, born: performance.now(), life: 500, color: flow.color });
+            stats.flashes++;
+          }
+        }
+      }
+    } else if (flow.id === 'lambda') {
+      for (let j = 0; j < N; j++) {
+        if (i === j) continue;
+        const s = synapses[i][j];
+        if (s.weight > 0.05) {
+          s.weight = Math.max(0, s.weight - 0.004 * eff);
+        }
+      }
+    } else if (flow.id === 'gamma') {
+      const local = [];
+      for (let j = 0; j < N; j++) {
+        if (i === j) continue;
+        if (synapses[i][j].weight > 0.05) {
+          local.push({ j, s: synapses[i][j] });
+        }
+      }
+      if (local.length > 1) {
+        local.sort((a, b) => a.s.weight - b.s.weight);
+        const weakest = local[0];
+        const strongest = local[local.length - 1];
+        const transfer = Math.min(weakest.s.weight, 0.003 * eff);
+        weakest.s.weight = Math.max(0, weakest.s.weight - transfer);
+        strongest.s.weight = Math.min(1, strongest.s.weight + transfer);
+      }
+    }
+  });
+}
+
+function decaySynapses(dt) {
+  const now = performance.now();
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      if (i === j) continue;
+      const s = synapses[i][j];
+      const age = (now - s.lastUsed) / 1000;
+      if (age > 2 && s.weight > 0) {
+        s.weight = Math.max(0, s.weight - params.decay * dt);
+      }
+    }
+  }
+}
+
+function updateTriad(dt) {
+  const target = 1/3;
+  const driftPsi    = (flows.psi.speed    - 0.05) * 0.15;
+  const driftOmega  = (flows.omega.speed  - 0.05) * 0.15;
+  const driftLambda = (flows.lambda.speed - 0.05) * 0.15;
+  const dPsi    = triad.psi    - target;
+  const dOmega  = triad.omega  - target;
+  const dLambda = triad.lambda - target;
+  triad.psi    += (driftPsi    - params.k * dPsi)    * dt;
+  triad.omega  += (driftOmega  - params.k * dOmega)  * dt;
+  triad.lambda += (driftLambda - params.k * dLambda) * dt;
+  triad.psi    = Math.max(0.05, Math.min(0.9, triad.psi));
+  triad.omega  = Math.max(0.05, Math.min(0.9, triad.omega));
+  triad.lambda = Math.max(0.05, Math.min(0.9, triad.lambda));
+  const sum = triad.psi + triad.omega + triad.lambda;
+  triad.psi /= sum; triad.omega /= sum; triad.lambda /= sum;
+}
+
+function deviation() {
+  const t = 1/3;
+  return Math.max(
+    Math.abs(triad.psi - t),
+    Math.abs(triad.omega - t),
+    Math.abs(triad.lambda - t)
+  );
+}
+
+// ядро K — обновление energy по разнице с периферией
+function updateCore(dt) {
+  // Σp = сумма активности периферии (упрощённо — от синапсов)
+  let total = 0;
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      if (i !== j) total += synapses[i][j].weight * 0.5;
+    }
+  }
+  const sumP = Math.max(0, total - coreEnergy * 0.5 + 8.5);
+  // K падает, когда Σp растёт
+  const target = BASE_CORE_ENERGY - sumP;
+  coreEnergy += (target - coreEnergy) * dt * 0.5;
+  coreEnergy = Math.max(0, Math.min(BASE_CORE_ENERGY, coreEnergy));
+
+  const p10 = BASE_CORE_ENERGY - coreEnergy - sumP;
+  safeSet('sum-p', sumP.toFixed(3));
+  safeSet('p10', Math.max(0, p10).toFixed(3));
+
+  // ∇n растёт при большой нагрузке
+  const load = sumP / BASE_CORE_ENERGY;
+  if (load > 0.15 && params.nabla < 1.0) {
+    params.nabla = Math.min(1.0, params.nabla + dt * 0.02);
+    const sl = $('sl-nabla');
+    if (sl) sl.value = Math.round(params.nabla * 100);
+    const vn = $('v-nabla');
+    if (vn) vn.textContent = params.nabla.toFixed(2);
+    const hn = $('h-nabla');
+    if (hn) hn.textContent = params.nabla.toFixed(2);
+  }
+
+  // ∇n = 1.0 → reset:full
+  if (params.nabla >= 1.0) {
+    log('∇n достиг 1.0 · авто-триггер reset:full', 'hot');
+    params.nabla = 0;
+    initSynapses(false);
+    coreEnergy = BASE_CORE_ENERGY;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// CANVAS
+// ═══════════════════════════════════════════════
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W = 800, H = 600;
+
+function resize() {
+  const r = canvas.getBoundingClientRect();
+  canvas.width = Math.max(1, r.width) * devicePixelRatio;
+  canvas.height = Math.max(1, r.height) * devicePixelRatio;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  W = r.width; H = r.height;
+}
+window.addEventListener('resize', resize);
+
+function neuronPos(idx) {
+  const n = NEURONS[idx];
+  const pad = 50;
+  return { x: pad + n.x * (W - pad * 2), y: pad + n.y * (H - pad * 2) };
+}
+
+function flowPos(flow) {
+  const near = nearestNeuron(flow.pos);
+  const p0 = neuronPos(near[0].i);
+  const p1 = neuronPos(near[1].i);
+  const w = near[1].w;
+  return { x: p0.x * (1 - w) + p1.x * w, y: p0.y * (1 - w) + p1.y * w };
+}
+
+function render(now) {
+  ctx.fillStyle = 'rgba(3, 3, 10, 0.32)';
+  ctx.fillRect(0, 0, W, H);
+
+  for (let i = 0; i < N; i++) {
+    for (let j = i + 1; j < N; j++) {
+      const w = Math.max(synapses[i][j].weight, synapses[j][i].weight);
+      if (w < 0.03) continue;
+      const vi = dimVisible(NEURONS[i].l);
+      const vj = dimVisible(NEURONS[j].l);
+      if (!vi && !vj) continue;
+      const p1 = neuronPos(i), p2 = neuronPos(j);
+      let alpha = Math.pow(w, 1.4) * 0.6;
+      if (!vi || !vj) alpha *= 0.25;
+      let r, g, b;
+      if (w > 0.7) { r = 255; g = 106; b = 154; }
+      else if (w > 0.4) { r = 124; g = 92; b = 255; }
+      else { r = 74; g = 132; b = 200; }
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      ctx.lineWidth = 0.4 + w * 2.2;
+      ctx.stroke();
+    }
+  }
+
+  for (let k = flashes.length - 1; k >= 0; k--) {
+    const f = flashes[k];
+    const age = now - f.born;
+    if (age > f.life) { flashes.splice(k, 1); continue; }
+    const t = 1 - age / f.life;
+    const p1 = neuronPos(f.i), p2 = neuronPos(f.j);
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.strokeStyle = f.color;
+    ctx.globalAlpha = t * 0.9;
+    ctx.lineWidth = 2 + t * 2;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  for (let i = 0; i < N; i++) {
+    const p = neuronPos(i);
+    const n = NEURONS[i];
+    const visible = dimVisible(n.l);
+    let heat = 0;
+    for (let j = 0; j < N; j++) if (i !== j) heat += synapses[i][j].weight;
+    heat = Math.min(1, heat / 8);
+    if (n.isBlind) heat *= 0.4;
+    const dim = LETTER_DIM[n.l];
+    const dimColor = DIMS[dim] ? DIMS[dim].color : '#8888a0';
+    const agentHL = highlightAgentIdx >= 0 && AGENTS[highlightAgentIdx].letters.includes(n.l);
+    const r = 4 + heat * 4;
+    const alpha = visible ? (0.5 + heat * 0.5) : 0.15;
+    let cr, cg, cb;
+    const dm = dimColor.match(/[0-9a-f]{2}/gi);
+    if (dm) { cr = parseInt(dm[0], 16); cg = parseInt(dm[1], 16); cb = parseInt(dm[2], 16); }
+    else { cr = 100; cg = 140; cb = 200; }
+    cr = Math.min(255, cr + heat * 60);
+    cg = Math.min(255, cg + heat * 30);
+    cb = Math.min(255, cb + heat * 30);
+    const isHover = i === hoveredNeuronIdx;
+    const isPinned = i === pinnedNeuronIdx;
+    if (isHover || isPinned || agentHL) {
+      const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 5);
+      const gc = agentHL ? '#8fd8b8' : isPinned ? '#ff6a9a' : '#ffffff';
+      glow.addColorStop(0, gc + '55');
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 5, 0, Math.PI * 2);
+      ctx.fillStyle = glow;
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${alpha})`;
+    ctx.fill();
+    if (n.isBlind) {
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + 5, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(120,120,140,0.6)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (isPinned) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ff6a9a';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    if (agentHL) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + 11, 0, Math.PI * 2);
+      ctx.strokeStyle = '#8fd8b8';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+    if (dim26Letter === n.l) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + 14, 0, Math.PI * 2);
+      ctx.strokeStyle = '#7aa2ff';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.font = visible ? '10px ui-monospace' : '9px ui-monospace';
+    ctx.fillStyle = visible
+      ? (heat > 0.4 ? `rgba(255,255,255,${0.7 + heat * 0.3})` : `rgba(180,180,200,0.7)`)
+      : 'rgba(120,120,140,0.25)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(n.l, p.x, p.y - r - 10);
+  }
+
+  for (const key in flows) {
+    const flow = flows[key];
+    if (!flow.active) continue;
+    const p = flowPos(flow);
+    const pulse = 1 + Math.sin(now * 0.01 + key.length) * 0.15;
+    const mult = PHASE_MULT[cyclePhase][key] * modeMult(key);
+    const sizeBoost = 1 + (mult - 1) * 0.3;
+    const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 26 * sizeBoost);
+    glow.addColorStop(0, flow.color + 'aa');
+    glow.addColorStop(1, flow.color + '00');
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 26 * sizeBoost, 0, Math.PI * 2);
+    ctx.fillStyle = glow;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5 * pulse * sizeBoost, 0, Math.PI * 2);
+    ctx.fillStyle = flow.color;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2 * pulse, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+  }
+
+  requestAnimationFrame(render);
+}
+
+// ═══════════════════════════════════════════════
+// HUD
+// ═══════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+function safeSet(id, val) { const el = $(id); if (el) el.textContent = val; }
+
+function updateHUD() {
+  let total = 0, strong = 0, weak = 0, dead = 0;
+  for (let i = 0; i < N; i++) {
+    for (let j = i + 1; j < N; j++) {
+      const w = Math.max(synapses[i][j].weight, synapses[j][i].weight);
+      if (w > 0.03) {
+        total++;
+        if (w > 0.7) strong++;
+        else if (w < 0.3) weak++;
+      } else dead++;
+    }
+  }
+  safeSet('h-synapses', total);
+  safeSet('h-cycle', CYCLE_PHASES[cyclePhase].name);
+  safeSet('h-nabla', params.nabla.toFixed(2));
+  safeSet('v-omega', triad.omega.toFixed(2));
+  safeSet('v-psi', triad.psi.toFixed(2));
+  safeSet('v-lambda', triad.lambda.toFixed(2));
+  const dev = deviation();
+  safeSet('v-dev', dev.toFixed(3));
+  const devBar = $('dev-bar');
+  if (devBar) devBar.style.setProperty('--dev', (dev * 400).toFixed(0) + '%');
+  const devState = $('v-dev-state');
+  if (devState) {
+    if (dev < 0.05) { devState.textContent = 'Γ держит'; devState.style.color = '#4aff9a'; }
+    else if (dev < 0.12) { devState.textContent = 'Γ корректирует'; devState.style.color = '#ffb84a'; }
+    else { devState.textContent = 'Γ перегружен'; devState.style.color = '#ff6a9a'; }
+  }
+  document.querySelectorAll('#cycle-row .phase').forEach((el, i) => {
+    el.classList.toggle('active', i === cyclePhase);
+    el.classList.toggle('done', i < cyclePhase);
+  });
+  safeSet('pos-psi', flows.psi.pos.toFixed(1));
+  safeSet('pos-omega', flows.omega.pos.toFixed(1));
+  safeSet('pos-lambda', flows.lambda.pos.toFixed(1));
+  safeSet('pos-gamma', flows.gamma.pos.toFixed(1));
+  safeSet('s-total', total);
+  safeSet('s-strong', strong);
+  safeSet('s-weak', weak);
+  safeSet('s-dead', dead);
+  safeSet('s-rewires', stats.rewires);
+  safeSet('s-links', stats.links);
+  safeSet('ov-tr', `такт ${cyclePhase + 1}/7 · ${git.currentBranch} · ${git.branches[git.currentBranch].head || '—'}`);
+  safeSet('ov-bl', strong > 15 ? 'перегрузка' : 'устойчиво');
+  safeSet('ov-br', `t = ${((performance.now() - startTime) / 1000).toFixed(1)} с`);
+}
+
+// ═══════════════════════════════════════════════
+// ЛОГ
+// ═══════════════════════════════════════════════
+const logEl = $('log');
+function log(text, cls) {
+  if (!logEl) return;
+  const d = document.createElement('div');
+  d.className = 'l' + (cls ? ' ' + cls : '');
+  d.innerHTML = `<b>${new Date().toTimeString().slice(0,8)}</b> · ${text}`;
+  logEl.insertBefore(d, logEl.firstChild);
+  while (logEl.children.length > 80) logEl.removeChild(logEl.lastChild);
+}
+
+// ═══════════════════════════════════════════════
+// ПОДАЧА МЫСЛИ
+// ═══════════════════════════════════════════════
+function wordProfile(text) {
+  const lower = text.toLowerCase();
+  const len = lower.length;
+  const vowels = (lower.match(/[аеёиоуыэюя]/g) || []).length;
+  const consonants = (lower.match(/[бвгджзклмнпрстфхцчшщ]/g) || []).length;
+  const soft = (lower.match(/[яеёюиь]/g) || []).length;
+  const hasQ = /\?/.test(text);
+  const hasExcl = /!/.test(text);
+  const hasDot = /\./.test(text);
+  const p = new Array(12).fill(0);
+  p[0] = hasExcl ? +1 : hasQ ? -1 : 0;
+  p[1] = len > 5 ? +1 : 0;
+  p[2] = hasQ ? -1 : hasDot ? +1 : 0;
+  p[3] = vowels > 2 ? +1 : 0;
+  p[4] = soft > 1 ? -1 : 0;
+  p[5] = len > 8 ? +1 : 0;
+  p[6] = hasExcl ? +1 : 0;
+  p[7] = consonants > 3 ? +1 : 0;
+  p[8] = (len % 2 === 0) ? +1 : -1;
+  p[9] = hasDot ? +1 : 0;
+  p[10] = hasQ ? +1 : 0;
+  p[11] = len > 3 ? +1 : 0;
+  return p;
+}
+
+function feedThought(text) {
+  if (!text.trim()) return;
+  stats.thoughts++;
+  stats.words += text.trim().split(/\s+/).length;
+  flows.psi.speed = Math.min(0.15, flows.psi.speed + 0.01);
+  const near = nearestNeuron(flows.psi.pos);
+  const targetIdx = near[0].i;
+  const targetLetter = NEURONS[targetIdx].l;
+  const profile = wordProfile(text);
+  if (NEURON_AXES[targetLetter]) {
+    for (let k = 0; k < 12; k++) {
+      NEURON_AXES[targetLetter][k] = Math.max(-1, Math.min(1,
+        NEURON_AXES[targetLetter][k] + profile[k] * 0.15));
+    }
+  }
+  for (let j = 0; j < N; j++) {
+    if (j === targetIdx) continue;
+    if (synapses[targetIdx][j].weight > 0.1) {
+      flashes.push({ i: targetIdx, j, born: performance.now(), life: 800, color: flows.psi.color });
+      stats.flashes++;
+    }
+  }
+  triad.psi += 0.02;
+  triad.lambda -= 0.01;
+  const s = triad.psi + triad.omega + triad.lambda;
+  triad.psi /= s; triad.omega /= s; triad.lambda /= s;
+  log(`мысль «${text.slice(0, 20)}${text.length > 20 ? '…' : ''}» → Ψ · сдвиг ${targetLetter}`, 'cool');
+  if (pinnedNeuronIdx === targetIdx) showCard(targetIdx, true);
+  if (dim26Letter === targetLetter) showDim26(targetLetter);
+}
+
+// ═══════════════════════════════════════════════
+// КАРТОЧКА НЕЙРОНА
+// ═══════════════════════════════════════════════
+const cardEl = $('neuron-card');
+
+function showCard(idx, pinned) {
+  if (idx < 0) { if (cardEl) cardEl.classList.remove('show'); return; }
+  if (!cardEl) return;
+  const n = NEURONS[idx];
+  const axes = NEURON_AXES[n.l] || new Array(12).fill(0);
+  const p = neuronPos(idx);
+  let heat = 0;
+  for (let j = 0; j < N; j++) if (idx !== j) heat += synapses[idx][j].weight;
+  const heatPct = Math.min(1, heat / 8);
+  let connections = 0, strongConn = 0;
+  for (let j = 0; j < N; j++) {
+    if (idx === j) continue;
+    const w = Math.max(synapses[idx][j].weight, synapses[j][idx].weight);
+    if (w > 0.1) connections++;
+    if (w > 0.6) strongConn++;
+  }
+  const dim = LETTER_DIM[n.l];
+  const dimColor = DIMS[dim] ? DIMS[dim].color : '#8888a0';
+  const agent = LETTER_AGENT[n.l];
+  let html = `<h4><span><span class="l">${n.l}</span> · ${n.name}</span>`;
+  if (dim) html += `<span class="dim d${dim}" style="color:${dimColor};border-color:${dimColor}66">${dim}D</span>`;
+  html += `</h4>`;
+  html += `<div class="pos">heat ${(heatPct * 100).toFixed(0)}% · ${connections} связей</div>`;
+  if (agent) {
+    html += `<div class="agent-badge ${agent.gen === 'klp' ? 'klp' : ''}">${agent.id} · ${agent.name}</div>`;
+  }
+  html += `<div class="axis-grid">`;
+  axes.forEach((v, k) => {
+    const barW = Math.abs(v) * 100;
+    const color = v > 0 ? '#4aff9a' : v < 0 ? '#ff6a9a' : '#2a2a3a';
+    html += `<div class="name">${AXES[k].name}</div>`;
+    html += `<div class="bar"><span style="width:${barW}%; background:${color};"></span></div>`;
+    html += `<div class="v">${v > 0 ? '+' : ''}${v.toFixed(2)}</div>`;
+  });
+  html += `</div>`;
+  if (pinned) {
+    html += `<div class="pin-hint">клик вне — отшпилить · двойной — 26D</div>`;
+    html += `<div id="axis-editor"></div>`;
+  } else {
+    html += `<div class="pin-hint">клик — закрепить · двойной — 26D</div>`;
+  }
+  cardEl.innerHTML = html;
+  const cx = Math.min(p.x + 20, W - 320);
+  const cy = Math.max(20, Math.min(p.y - 20, H - 480));
+  cardEl.style.left = cx + 'px';
+  cardEl.style.top = cy + 'px';
+  cardEl.classList.add('show');
+  cardEl.classList.toggle('pinned', !!pinned);
+  if (pinned) renderAxisEditor(n.l);
+}
+
+function renderAxisEditor(letter) {
+  const ed = document.getElementById('axis-editor');
+  if (!ed) return;
+  const axes = NEURON_AXES[letter];
+  let html = '<div class="title">редактор осей</div>';
+  axes.forEach((v, k) => {
+    html += `<div class="slider-row">
+      <label>${AXES[k].name}</label>
+      <input type="range" min="-100" max="100" value="${Math.round(v * 100)}" data-axis="${k}" data-letter="${letter}" step="1">
+      <span class="val">${v > 0 ? '+' : ''}${v.toFixed(2)}</span>
+    </div>`;
+  });
+  html += `<div class="row">
+    <button id="axis-reset">сбросить</button>
+    <button id="axis-random">случайно</button>
+    <button id="axis-26d">26D</button>
+  </div>`;
+  ed.innerHTML = html;
+  ed.querySelectorAll('input[type=range]').forEach(inp => {
+    inp.addEventListener('input', (e) => {
+      const k = +e.target.dataset.axis;
+      const L = e.target.dataset.letter;
+      const val = +e.target.value / 100;
+      NEURON_AXES[L][k] = val;
+      const span = e.target.parentElement.querySelector('.val');
+      span.textContent = (val > 0 ? '+' : '') + val.toFixed(2);
+    });
+  });
+  const rst = document.getElementById('axis-reset');
+  if (rst) rst.addEventListener('click', () => {
+    NEURON_AXES[letter] = DEFAULT_AXES[letter].slice();
+    showCard(pinnedNeuronIdx, true);
+  });
+  const rnd = document.getElementById('axis-random');
+  if (rnd) rnd.addEventListener('click', () => {
+    for (let k = 0; k < 12; k++) NEURON_AXES[letter][k] = (Math.random() * 2 - 1);
+    showCard(pinnedNeuronIdx, true);
+  });
+  const d26 = document.getElementById('axis-26d');
+  if (d26) d26.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showDim26(letter);
+  });
+}
+
+// мышь
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  let closest = -1, closestD = 20;
+  for (let i = 0; i < N; i++) {
+    const p = neuronPos(i);
+    const d = Math.hypot(p.x - mx, p.y - my);
+    if (d < closestD) { closestD = d; closest = i; }
+  }
+  if (closest !== hoveredNeuronIdx) {
+    hoveredNeuronIdx = closest;
+    if (pinnedNeuronIdx < 0) {
+      if (closest >= 0) showCard(closest, false);
+      else if (cardEl) cardEl.classList.remove('show');
+    }
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoveredNeuronIdx = -1;
+  if (pinnedNeuronIdx < 0 && cardEl) cardEl.classList.remove('show');
+});
+
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  let closest = -1, closestD = 20;
+  for (let i = 0; i < N; i++) {
+    const p = neuronPos(i);
+    const d = Math.hypot(p.x - mx, p.y - my);
+    if (d < closestD) { closestD = d; closest = i; }
+  }
+  if (closest >= 0) {
+    if (pinnedNeuronIdx === closest) {
+      pinnedNeuronIdx = -1;
+      if (hoveredNeuronIdx >= 0) showCard(hoveredNeuronIdx, false);
+      else if (cardEl) cardEl.classList.remove('show');
+    } else {
+      pinnedNeuronIdx = closest;
+      showCard(closest, true);
+    }
+  } else {
+    if (pinnedNeuronIdx >= 0) {
+      pinnedNeuronIdx = -1;
+      if (hoveredNeuronIdx >= 0) showCard(hoveredNeuronIdx, false);
+      else if (cardEl) cardEl.classList.remove('show');
+    }
+  }
+});
+
+canvas.addEventListener('dblclick', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  let closest = -1, closestD = 20;
+  for (let i = 0; i < N; i++) {
+    const p = neuronPos(i);
+    const d = Math.hypot(p.x - mx, p.y - my);
+    if (d < closestD) { closestD = d; closest = i; }
+  }
+  if (closest >= 0) showDim26(NEURONS[closest].l);
+});
+
+// закрытия карточек
+const closeMap = {
+  'dim26-close': closeDim26,
+  'heatmap-close': closeHeatmap,
+  'diff-close': closeDiff,
+  'merge-close': closeMerge,
+};
+for (const id in closeMap) {
+  const el = $(id);
+  if (el) el.addEventListener('click', closeMap[id]);
+}
+
+// ═══════════════════════════════════════════════
+// UI КНОПКИ
+// ═══════════════════════════════════════════════
+function submit() {
+  const q = $('q');
+  if (!q) return;
+  feedThought(q.value);
+  q.value = '';
+}
+const sendBtn = $('send');
+if (sendBtn) sendBtn.addEventListener('click', submit);
+const qEl = $('q');
+if (qEl) qEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submit();
+});
+
+const btnPause = $('btn-pause');
+if (btnPause) btnPause.addEventListener('click', (e) => {
+  running = !running;
+  e.target.textContent = running ? '⏸' : '▶';
+  if (running) lastTime = performance.now();
+});
+
+const btnCommit = $('btn-commit');
+if (btnCommit) btnCommit.addEventListener('click', () => {
+  const msg = prompt('сообщение коммита:', 'снапшот');
+  if (msg !== null) commit(msg);
+});
+
+const btnHeatmap = $('btn-heatmap');
+if (btnHeatmap) btnHeatmap.addEventListener('click', showHeatmap);
+
+const btnExport = $('btn-export');
+if (btnExport) btnExport.addEventListener('click', exportState);
+
+const btnImport = $('btn-import');
+if (btnImport) btnImport.addEventListener('click', () => {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json';
+  inp.onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) importState(file);
+  };
+  inp.click();
+});
+
+let soundOn = false;
+const btnSound = $('btn-sound');
+if (btnSound) btnSound.addEventListener('click', (e) => {
+  soundOn = !soundOn;
+  e.target.textContent = soundOn ? '♪●' : '♪';
+});
+
+// GIT actions
+const gitActions = {
+  'git-branch-new': () => branchReset(),
+  'git-checkout': () => {
+    const branch = git.branches[git.currentBranch];
+    if (branch.commits.length < 2) { log('нет предыдущих коммитов', 'warn'); return; }
+    checkoutCommit(branch.commits[branch.commits.length - 2].id);
+  },
+  'git-merge': showMerge,
+  'git-diff': showDiff,
+  'git-log': () => {
+    const branch = git.branches[git.currentBranch];
+    log(`GIT4 · log ветки ${git.currentBranch}:`, 'cool');
+    branch.commits.slice().reverse().forEach(c => {
+      log(`  ${c.hash} · ${c.msg} · ${c.time}`, '');
+    });
+  },
+  'git-reset': () => {
+    const branch = git.branches[git.currentBranch];
+    if (branch.commits.length < 2) { log('некуда сбрасывать', 'warn'); return; }
+    const prev = branch.commits[branch.commits.length - 2];
+    restoreSnapshot(prev.snapshot);
+    branch.head = prev.id;
+    renderGit();
+    log(`GIT4 · HEAD~1 → ${prev.hash}`, 'warn');
+  },
+};
+for (const id in gitActions) {
+  const el = $(id);
+  if (el) el.addEventListener('click', gitActions[id]);
+}
+
+// merge strategy
+document.querySelectorAll('#merge-strategy button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#merge-strategy button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    mergeState.strategy = b.dataset.s;
+  });
+});
+const mergeApply = $('merge-apply');
+if (mergeApply) mergeApply.addEventListener('click', applyMerge);
+
+// режимы MONOMOD
+function setMode(mode, silent) {
+  if (!MODES[mode]) return;
+  currentMode = mode;
+  document.querySelectorAll('#modes-row button').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  const desc = $('mode-desc');
+  if (desc) desc.innerHTML = MODES[mode].desc;
+  safeSet('h-mode', MODES[mode].name);
+  safeSet('mf-psi', MODES[mode].flows.psi.toFixed(2));
+  safeSet('mf-omega', MODES[mode].flows.omega.toFixed(2));
+  safeSet('mf-lambda', MODES[mode].flows.lambda.toFixed(2));
+  safeSet('mf-gamma', MODES[mode].flows.gamma.toFixed(2));
+  if (!silent) log(`MONOMOD · режим: ${MODES[mode].name}`, 'cool');
+}
+document.querySelectorAll('#modes-row button').forEach(b => {
+  b.addEventListener('click', () => setMode(b.dataset.mode));
+});
+
+// ∇n ползунок
+const slNabla = $('sl-nabla');
+if (slNabla) slNabla.addEventListener('input', () => {
+  params.nabla = +slNabla.value / 100;
+  safeSet('v-nabla', params.nabla.toFixed(2));
+  safeSet('h-nabla', params.nabla.toFixed(2));
+});
+
+// мерности
+document.querySelectorAll('#dims-row button').forEach(b => {
+  b.addEventListener('click', () => {
+    currentDim = +b.dataset.dim;
+    document.querySelectorAll('#dims-row button').forEach(x => {
+      x.classList.toggle('active', +x.dataset.dim === currentDim);
+    });
+    const desc = $('dim-desc');
+    if (currentDim === 0) {
+      if (desc) desc.textContent = 'видны все 26 нейронов';
+    } else {
+      const d = DIMS[currentDim];
+      if (desc) desc.innerHTML = `<b style="color:${d.color}">${d.full}</b>`;
+    }
+  });
+});
+
+// агенты
+const agentsListEl = $('agents-list');
+function renderAgents() {
+  if (!agentsListEl) return;
+  let html = '';
+  AGENTS.forEach((a, idx) => {
+    const hl = highlightAgentIdx === idx ? 'highlight' : '';
+    const muted = a.active ? '' : 'muted';
+    html += `<div class="agent-row ${a.gen} ${hl} ${muted}" data-idx="${idx}">
+      <span class="id">${a.id}</span>
+      <span class="role">${a.role}</span>
+      <span class="letter">${a.letters.join(' ')}</span>
+      <span class="toggle ${a.active ? 'on' : ''}" data-toggle="${idx}">${a.active ? '⇄' : '○'}</span>
+    </div>`;
+  });
+  agentsListEl.innerHTML = html;
+  agentsListEl.querySelectorAll('.agent-row').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target.dataset.toggle !== undefined) return;
+      const idx = +el.dataset.idx;
+      highlightAgentIdx = highlightAgentIdx === idx ? -1 : idx;
+      renderAgents();
+    });
+  });
+  agentsListEl.querySelectorAll('.toggle').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = +el.dataset.toggle;
+      AGENTS[idx].active = !AGENTS[idx].active;
+      renderAgents();
+    });
+  });
+}
+
+// ползунки скоростей
+function bindSlider(id, valId, onChange, fmt) {
+  const sl = $(id);
+  const vl = $(valId);
+  if (!sl) return;
+  sl.addEventListener('input', () => {
+    const v = +sl.value;
+    onChange(v);
+    if (vl) vl.textContent = fmt ? fmt(v) : v;
+  });
+  sl.dispatchEvent(new Event('input'));
+}
+bindSlider('sl-psi', 'v-psi-speed', v => { flows.psi.speed = v * 0.01; }, v => (v * 0.01).toFixed(3));
+bindSlider('sl-omega', 'v-omega-speed', v => { flows.omega.speed = v * 0.01; }, v => (v * 0.01).toFixed(3));
+bindSlider('sl-lambda', 'v-lambda-speed', v => { flows.lambda.speed = v * 0.01; }, v => (v * 0.01).toFixed(3));
+bindSlider('sl-gamma', 'v-gamma-speed', v => { flows.gamma.speed = v * 0.01; }, v => (v * 0.01).toFixed(3));
+bindSlider('sl-k', 'v-k', v => { params.k = v * 0.1; }, v => (v * 0.1).toFixed(2));
+bindSlider('sl-tick', 'v-tick', v => { params.tickLen = v; }, v => String(v));
+
+// сворачивание
+document.querySelectorAll('.panel h3').forEach(h => {
+  h.addEventListener('click', () => h.parentElement.classList.toggle('collapsed'));
+});
+
+// ═══════════════════════════════════════════════
+// ГЛАВНЫЙ ЦИКЛ
+// ═══════════════════════════════════════════════
+let lastTime = performance.now();
+
+function tickFn() {
+  if (!running) { lastTime = performance.now(); return; }
+  const now = performance.now();
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+  tick++;
+
+  cycleTick++;
+  if (cycleTick >= params.tickLen) {
+    cycleTick = 0;
+    cyclePhase = (cyclePhase + 1) % 7;
+  }
+
+  stepFlow(flows.psi, dt);
+  stepFlow(flows.omega, dt);
+  stepFlow(flows.lambda, dt);
+  stepFlow(flows.gamma, dt);
+  decaySynapses(dt);
+  updateTriad(dt);
+  updateCore(dt);
+
+  updateHUD();
+}
+
+// ═══════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════
+function boot() {
+  resize();
+  initSynapses(false);
+  renderAgents();
+  renderGit();
+  setMode('dialog', true);
+  updateHUD();
+  log('GIT4.12 · ABCDE интеграция', 'ok');
+  log('26 нейронов · 12 осей · 7 агентов · 5 модов · ∇n · K₁K₂K₃', 'ok');
+  log('клик → оси · двойной → 26D · ⎇ commit · ⇄ diff · ⎈ merge', 'cool');
+  log('26×26 heatmap — кнопка в шапке', 'cool');
+
+  commit('старт GIT4.12');
+
+  setInterval(tickFn, 16);
+  requestAnimationFrame(render);
+
+  setInterval(() => {
+    if (!running) return;
+    const branch = git.branches[git.currentBranch];
+    if (branch.commits.length > 0) {
+      const lastHash = branch.commits[branch.commits.length - 1].hash;
+      const curHash = hashSnapshot();
+      if (curHash !== lastHash) {
+        commit('авто-коммит');
+      }
+    }
+  }, 90000);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}
+</script>
+
+</body>
+</html>
