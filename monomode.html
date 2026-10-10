@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MONOMOD · GIT6 · ЭХО</title>
+<style>
+:root{--bg:#0a0a0c;--accent:#4dd0c7;--text:#c8c8d4;--gold:#ffd700;--purple:#a78bfa;--psi:#e8c39e;--omega:#7aa2ff;--lambda:#ffa840}
+*{box-sizing:border-box;margin:0;padding:0}
+body{height:100vh;background:var(--bg);color:var(--text);font-family:'Courier New',monospace;display:flex;flex-direction:column;overflow:hidden}
+#header{padding:6px 12px;background:#08080c;border-bottom:1px solid #14141c;display:flex;gap:8px;align-items:center;font-size:10px;flex-wrap:wrap}
+#header .core{color:var(--accent);font-weight:bold}
+#header .mode{color:var(--purple)}
+#header .role{color:var(--gold);font-size:9px}
+#header .spacer{margin-left:auto}
+#header .stat{color:#8888a0;font-size:9px}
+#header .stat b{color:var(--text)}
+#stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+canvas#field{position:absolute;inset:0;width:100%;height:100%}
+#sphere-wrap{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:12px}
+.sphere{width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,var(--accent) 0%,transparent 70%);opacity:0;transform:scale(.8);transition:opacity 1.5s,transform 4s,background 1s}
+.sphere.active{opacity:.6;transform:scale(1);animation:breathe 6s infinite ease-in-out}
+.sphere.golden{background:radial-gradient(circle,var(--gold) 0%,transparent 70%);opacity:.9;box-shadow:0 0 60px rgba(255,215,0,.6);animation:pulse .5s infinite}
+.sphere.silence{background:radial-gradient(circle,#222 0%,transparent 70%);opacity:.3;animation:none}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05);filter:blur(2px)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1);filter:blur(4px)}}
+#echo-display{position:absolute;top:15%;left:50%;transform:translateX(-50%);text-align:center;font-size:20px;color:var(--gold);opacity:0;transition:opacity 1.5s;z-index:3;text-shadow:0 0 30px rgba(255,215,0,.4);max-width:80%;pointer-events:none;letter-spacing:2px}
+#echo-display.visible{opacity:1}
+#echo-type{font-size:10px;color:#8888a0;letter-spacing:3px;margin-top:8px}
+#input-area{position:absolute;bottom:18%;width:70%;max-width:550px;text-align:center;z-index:4;opacity:0;transition:opacity 1s}
+#input-area.visible{opacity:1}
+input#user-input{width:100%;background:transparent;border:none;border-bottom:1px solid #333;color:var(--text);font-size:18px;text-align:center;outline:none;padding:8px;font-family:inherit}
+#slider{height:2px;background:#1a1a1e;width:100%;z-index:5}
+#slider-fill{height:100%;background:var(--accent);width:0%;transition:width .8s}
+#journal{position:absolute;left:12px;bottom:60px;width:280px;max-height:35%;overflow-y:auto;font-size:9px;line-height:1.5;color:#44445a;z-index:4;pointer-events:none}
+#journal .fr{padding:2px 6px;border-left:1px solid #1a1a24;margin-bottom:2px}
+#journal .fr b{color:var(--purple);font-weight:normal}
+#journal .fr.echo{border-left-color:var(--gold);color:var(--gold)}
+#journal .fr.spiral{border-left-color:var(--lambda);color:var(--lambda)}
+#journal .fr.limit{border-left-color:#ff4757;color:#ff4757}
+#status-bar{position:absolute;top:8px;left:12px;font-size:9px;color:#555;z-index:3}
+#status-bar b{color:var(--text)}
+</style>
+</head>
+<body>
+<div id="header">
+  <span class="core">MONOMOD</span>
+  <span class="mode">MONOMODE</span>
+  <span class="role" id="role-display">Ψ:ЗАПРОС · Ω:ЭХО · Λ:ТИШИНА</span>
+  <span class="spacer"></span>
+  <span class="stat">L<b id="h-level">0</b></span>
+  <span class="stat">связи:<b id="h-edges">0</b></span>
+  <span class="stat">шаблоны:<b id="h-templates">0</b></span>
+  <span class="stat">эхо:<b id="h-echoes">0</b></span>
+  <span class="stat">цикл:<b id="h-cycle">0</b></span>
+</div>
+
+<div id="stage">
+  <canvas id="field"></canvas>
+  <div id="status-bar">
+    <span>вес:<b id="sb-weight">0.30</b></span> ·
+    <span>плотность:<b id="sb-density">0.00</b></span> ·
+    <span>эхо:<b id="sb-echo">—</b></span>
+  </div>
+  <div id="echo-display"><span id="echo-text"></span><div id="echo-type"></div></div>
+  <div id="sphere-wrap"><div id="sphere" class="sphere"></div></div>
+  <div id="input-area" class="visible">
+    <input type="text" id="user-input" placeholder="..." autocomplete="off">
+  </div>
+  <div id="journal"></div>
+</div>
+<div id="slider"><div id="slider-fill"></div></div>
+
+<script>
+// ============================================================================
+// L0 · ЧИСТОЕ СЕМЯ (НЕИЗМЕНЯЕМОЕ ЯДРО)
+// ============================================================================
+const LINK_GRAPH = {
+  edges: new Map(),
+  strengthen(w1, w2, dim) {
+    const key = [w1, w2].sort().join('→');
+    const link = this.edges.get(key) || { weight: 0.3, dim, count: 0, lastUsed: Date.now() };
+    link.weight = Math.min(1.0, link.weight * 1.05);
+    link.count++;
+    link.lastUsed = Date.now();
+    this.edges.set(key, link);
+    if (link.count >= 3 && link.weight > 0.5) {
+      TemplateArchive.tryCreate([w1, w2], dim, link.weight);
+    }
+  },
+  decay() {
+    const now = Date.now();
+    for (const [key, link] of this.edges) {
+      const hours = (now - link.lastUsed) / 3600000;
+      if (hours > 24) { link.weight *= 0.9; if (link.weight < 0.15) this.edges.delete(key); }
+    }
+  },
+  init() {
+    const s = localStorage.getItem('mm_graph');
+    if (s) this.edges = new Map(JSON.parse(s));
+  },
+  save() { localStorage.setItem('mm_graph', JSON.stringify(Array.from(this.edges.entries()))); },
+  query(pattern) {
+    const r = [];
+    for (const [key, link] of this.edges) { if (key.includes(pattern)) r.push({ key, link }); }
+    return r;
+  },
+  getRelated(word, minWeight) {
+    const r = [];
+    for (const [key, link] of this.edges) {
+      if (link.weight >= (minWeight || 0.5)) {
+        const parts = key.split('→');
+        if (parts[0] === word) r.push({ word: parts[1], weight: link.weight });
+        else if (parts[1] === word) r.push({ word: parts[0], weight: link.weight });
+      }
+    }
+    return r.sort((a, b) => b.weight - a.weight);
+  },
+  topWeight() {
+    let max = 0;
+    for (const [, link] of this.edges) { if (link.weight > max) max = link.weight; }
+    return max;
+  }
+};
+
+const TemplateArchive = {
+  archive: new Map(),
+  generateId(words) {
+    const str = words.slice().sort().join('|').toLowerCase();
+    let h = 0;
+    for (let i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0; }
+    return 'TPL-' + Math.abs(h).toString(16).padStart(8, '0').slice(0, 8);
+  },
+  tryCreate(words, dim, weight) {
+    const id = this.generateId(words);
+    if (this.archive.has(id)) { const t = this.archive.get(id); t.lastUsed = Date.now(); t.usageCount++; return; }
+    this.archive.set(id, { id, words: words.slice().sort(), dim, weight: +weight.toFixed(3), created: Date.now(), lastUsed: Date.now(), usageCount: 1 });
+    this.save();
+    showGoldenSphere();
+  },
+  init() {
+    const s = localStorage.getItem('mm_templates');
+    if (s) { try { this.archive = new Map(JSON.parse(s)); } catch (e) { this.archive = new Map(); } }
+  },
+  save() { localStorage.setItem('mm_templates', JSON.stringify(Array.from(this.archive.entries()))); }
+};
+
+const Memory = {
+  trail: [], maxSize: 110,
+  record(words, dim, durability) {
+    this.trail.push({ words, dim, durability: +durability.toFixed(3), ts: Date.now() });
+    if (this.trail.length > this.maxSize) this.trail.shift();
+  },
+  init() {
+    const s = localStorage.getItem('mm_trail');
+    if (s) this.trail = JSON.parse(s);
+  },
+  save() { localStorage.setItem('mm_trail', JSON.stringify(this.trail)); }
+};
+
+// ============================================================================
+// MONOMODE · НАДСТРОЙКА (КЭШ-ИНТЕРПРЕТАТОР)
+// ============================================================================
+const MONOMODE = {
+  version: 'GIT6',
+  spiralLevel: 0,
+  cycleCount: 0,
+  echoCount: 0,
+  closureThreshold: { edges: 30, weight: 0.90 },
+
+  init() {
+    const s = localStorage.getItem('mm_monomode_state');
+    if (s) {
+      try {
+        const d = JSON.parse(s);
+        this.spiralLevel = d.spiralLevel || 0;
+        this.cycleCount = d.cycleCount || 0;
+        this.echoCount = d.echoCount || 0;
+      } catch (e) {}
+    }
+    log('MONOMODE ' + this.version + ' · L' + this.spiralLevel + ' · циклов:' + this.cycleCount, 'spiral');
+  },
+  save() {
+    localStorage.setItem('mm_monomode_state', JSON.stringify({
+      spiralLevel: this.spiralLevel,
+      cycleCount: this.cycleCount,
+      echoCount: this.echoCount
+    }));
+  }
+};
+
+// ============================================================================
+// ЭХО-ДВИГАТЕЛЬ
+// ============================================================================
+const Echo = {
+  generate(word) {
+    const level = MONOMODE.spiralLevel;
+    const related = LINK_GRAPH.getRelated(word, 0.5);
+    const topW = LINK_GRAPH.topWeight();
+    const edges = LINK_GRAPH.edges.size;
+
+    // Проверка предела
+    if (level >= 7 && topW > 0.95 && edges > MONOMODE.closureThreshold.edges) {
+      return { type: 'silence', text: '...', resonance: 0, message: 'тишина · расширь восприятие' };
+    }
+
+    // Эхо повторения (L0-L2)
+    if (level <= 2) {
+      if (related.length === 0) {
+        return { type: 'repeat', text: word, resonance: 0.2, message: 'эхо повторения' };
+      }
+      return { type: 'repeat', text: word + ' · ' + related[0].word, resonance: related[0].weight, message: 'эхо повторения' };
+    }
+
+    // Эхо усиления (L3-L5)
+    if (level <= 5) {
+      const words = related.slice(0, 3).map(r => r.word);
+      if (words.length === 0) return { type: 'amplify', text: word, resonance: 0.5, message: 'эхо усиления' };
+      return { type: 'amplify', text: word + ' · ' + words.join(' · '), resonance: related[0].weight, message: 'эхо усиления' };
+    }
+
+    // Эхо преломления (L6-L7)
+    const inversions = {
+      'свет': 'то что было до тени', 'тьма': 'то что было до света',
+      'глубина': 'то что на поверхности', 'связь': 'то что между',
+      'смысл': 'то что до слова', 'форма': 'то что до формы',
+      'я': 'то что до я', 'ты': 'то что до тебя',
+      'они': 'то что до них', 'спираль': 'то что до витка',
+      'цикл': 'то что до круга', 'тишина': 'то что до звука',
+      'эхо': 'то что до голоса', 'память': 'то что до забвения',
+      'время': 'то что до сейчас', 'точка': 'то что до начала'
+    };
+    const inv = inversions[word] || ('то что было до ' + word);
+    return { type: 'refract', text: inv, resonance: topW, message: 'эхо преломления' };
+  },
+
+  checkClosure() {
+    const edges = LINK_GRAPH.edges.size;
+    const topW = LINK_GRAPH.topWeight();
+    if (edges >= MONOMODE.closureThreshold.edges && topW >= MONOMODE.closureThreshold.weight) {
+      return true;
+    }
+    return false;
+  },
+
+  spiralNext() {
+    MONOMODE.spiralLevel++;
+    MONOMODE.cycleCount++;
+    MONOMODE.closureThreshold.edges = Math.floor(MONOMODE.closureThreshold.edges * 1.5);
+    MONOMODE.closureThreshold.weight = Math.min(0.99, MONOMODE.closureThreshold.weight + 0.02);
+
+    // Сжатие: генерируем семя
+    const topEdges = Array.from(LINK_GRAPH.edges.entries())
+      .sort((a, b) => b[1].weight - a[1].weight).slice(0, 8).map(e => e[0]).join(',');
+    let hash = 0;
+    for (let i = 0; i < topEdges.length; i++) { hash = ((hash << 5) - hash) + topEdges.charCodeAt(i); hash |= 0; }
+    const seed = 'SEED-' + Math.abs(hash).toString(16).padStart(8, '0').toUpperCase();
+
+    TemplateArchive.tryCreate(['spiral', 'L' + MONOMODE.spiralLevel, 'compressed'], 'meta', 1.0);
+    MONOMODE.save();
+
+    log('СПИРАЛЬ L' + MONOMODE.spiralLevel + ' · ' + seed, 'spiral');
+    showStatus('СПИРАЛЬ L' + MONOMODE.spiralLevel + ' · META+1');
+    return seed;
+  }
+};
+
+// ============================================================================
+// ВИЗУАЛИЗАЦИЯ (Canvas)
+// ============================================================================
+const canvas = document.getElementById('field');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() {
+  const r = canvas.getBoundingClientRect();
+  canvas.width = r.width; canvas.height = r.height;
+  W = r.width; H = r.height;
+}
+window.addEventListener('resize', resize);
+
+function drawField(now) {
+  ctx.fillStyle = 'rgba(10,10,12,0.15)';
+  ctx.fillRect(0, 0, W, H);
+  const t = now * 0.001;
+  const density = LINK_GRAPH.edges.size / 100;
+  const cx = W / 2, cy = H / 2;
+
+  for (let i = 0; i < Math.min(LINK_GRAPH.edges.size, 60); i++) {
+    const angle = (i / 60) * Math.PI * 2 + t * 0.2;
+    const r = 80 + Math.sin(t + i) * 40 + density * 60;
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+    ctx.beginPath();
+    ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(77,208,199,${0.2 + density * 0.3})`;
+    ctx.fill();
+  }
+}
+
+// ============================================================================
+// UI
+// ============================================================================
+const sphere = document.getElementById('sphere');
+const inputArea = document.getElementById('input-area');
+const input = document.getElementById('user-input');
+const slider = document.getElementById('slider-fill');
+const echoDisplay = document.getElementById('echo-display');
+const echoText = document.getElementById('echo-text');
+const echoType = document.getElementById('echo-type');
+const journalEl = document.getElementById('journal');
+
+function showGoldenSphere() {
+  sphere.className = 'sphere golden';
+  setTimeout(() => { if (sphere.classList.contains('golden')) sphere.className = 'sphere active'; }, 3000);
+}
+
+function showEcho(echo) {
+  echoText.textContent = echo.text;
+  echoType.textContent = echo.message + ' · resonance: ' + echo.resonance.toFixed(2);
+  echoDisplay.classList.add('visible');
+  MONOMODE.echoCount++;
+
+  if (echo.type === 'silence') {
+    sphere.className = 'sphere silence';
+    log('ТИШИНА · расширь восприятие', 'limit');
+  } else if (echo.type === 'refract') {
+    sphere.className = 'sphere golden';
+    log('ЭХО: ' + echo.text, 'echo');
+  } else {
+    log('эхо: ' + echo.text, 'echo');
+  }
+
+  setTimeout(() => {
+    echoDisplay.classList.remove('visible');
+    if (echo.type !== 'silence') sphere.className = 'sphere active';
+  }, 4000);
+}
+
+function showStatus(msg) {
+  document.getElementById('sb-echo').textContent = msg;
+}
+
+function log(text, cls) {
+  const d = document.createElement('div');
+  d.className = 'fr ' + (cls || '');
+  d.innerHTML = '<b>' + new Date().toTimeString().slice(0, 8) + '</b> ' + text;
+  journalEl.appendChild(d);
+  while (journalEl.children.length > 50) journalEl.removeChild(journalEl.firstChild);
+}
+
+function transition(phase) {
+  slider.style.width = phase === 'P0' ? '0%' : '100%';
+  if (phase === 'P0') { sphere.className = 'sphere'; inputArea.className = 'visible'; input.value = ''; input.focus(); }
+  else if (phase === 'P3') { inputArea.className = ''; sphere.className = 'sphere active'; }
+  else if (phase === 'P7') { sphere.className = 'sphere rupture'; setTimeout(() => transition('P0'), 2500); }
+  else if (phase === 'P10') { sphere.className = 'sphere active'; setTimeout(() => transition('P0'), 2000); }
+}
+
+function updateUI() {
+  document.getElementById('h-level').textContent = MONOMODE.spiralLevel;
+  document.getElementById('h-edges').textContent = LINK_GRAPH.edges.size;
+  document.getElementById('h-templates').textContent = TemplateArchive.archive.size;
+  document.getElementById('h-echoes').textContent = MONOMODE.echoCount;
+  document.getElementById('h-cycle').textContent = MONOMODE.cycleCount;
+  document.getElementById('sb-weight').textContent = LINK_GRAPH.topWeight().toFixed(2);
+  document.getElementById('sb-density').textContent = (LINK_GRAPH.edges.size / 100).toFixed(2);
+}
+
+// ============================================================================
+// ОБРАБОТКА ВВОДА
+// ============================================================================
+function processInput(raw) {
+  const cmd = raw.trim().toLowerCase();
+  const words = cmd.replace(/[^\w\sа-яА-ЯёЁ]/g, '').split(/\s+/).filter(w => w.length > 1);
+  if (words.length === 0) { transition('P0'); return; }
+
+  // 1. Укрепление связей (Ψ · MONOMOD)
+  for (let i = 0; i < words.length; i++) {
+    for (let j = i + 1; j < words.length; j++) {
+      LINK_GRAPH.strengthen(words[i], words[j], '3D');
+    }
+  }
+  LINK_GRAPH.decay();
+  LINK_GRAPH.save();
+  Memory.record(words, '3D', 0.5);
+  Memory.save();
+
+  // 2. Генерация эха (Ω · MONOMODE)
+  const mainWord = words[0];
+  const echo = Echo.generate(mainWord);
+  showEcho(echo);
+
+  // 3. Проверка замкнутости → спираль
+  if (Echo.checkClosure()) {
+    Echo.spiralNext();
+  }
+
+  updateUI();
+  if (echo.type === 'silence') transition('P7');
+  else transition('P10');
+}
+
+// ============================================================================
+// СТАРТ
+// ============================================================================
+LINK_GRAPH.init();
+Memory.init();
+TemplateArchive.init();
+MONOMODE.init();
+resize();
+transition('P0');
+updateUI();
+
+log('MONOMOD · GIT6 · ЭХО', 'spiral');
+log('Ψ:ЗАПРОС · Ω:ЭХО · Λ:ТИШИНА', 'echo');
+log('введи слово · услышь эхо · расширь восприятие', '');
+
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && input.value.trim()) {
+    transition('P3');
+    setTimeout(() => processInput(input.value), 600);
+  }
+});
+
+// Анимация поля
+function animate(now) {
+  drawField(now);
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+
+// Периодическое затухание
+setInterval(() => { LINK_GRAPH.decay(); LINK_GRAPH.save(); }, 60000);
+</script>
+</body>
+</html>
