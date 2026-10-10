@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MONOMOD · СОСТОЯНИЕ</title>
+<style>
+:root{--bg:#050508;--accent:#4dd0c7;--text:#c8c8d4;--gold:#ffd700;--psi:#e8c39e;--omega:#7aa2ff;--lambda:#ffa840;--gamma:#8fd8b8}
+*{box-sizing:border-box;margin:0;padding:0}
+body{height:100vh;background:var(--bg);color:var(--text);font-family:'Courier New',monospace;display:grid;grid-template-rows:36px 1fr 48px;overflow:hidden}
+#hud{padding:6px 12px;background:#08080c;border-bottom:1px solid #14141c;display:flex;gap:10px;align-items:center;font-size:10px;letter-spacing:1px}
+#hud .c{color:var(--accent);font-weight:bold}
+#hud .m{color:var(--gold)}
+#hud .s{margin-left:auto;color:#555}
+#main{display:grid;grid-template-columns:1fr 320px;overflow:hidden}
+#stage{position:relative;background:radial-gradient(circle at 50% 50%,#0c0c14,#050508 75%);overflow:hidden}
+canvas{position:absolute;inset:0;width:100%;height:100%}
+#side{background:#08080c;border-left:1px solid #14141c;overflow-y:auto;font-size:10px}
+.pnl{padding:8px 10px;border-bottom:1px solid #14141c}
+.pnl h3{font-size:9px;font-weight:normal;text-transform:uppercase;letter-spacing:1.5px;color:#555;margin-bottom:6px;cursor:pointer}
+.pnl h3::after{content:" ▾";opacity:.4;font-size:8px}
+.pnl.shut h3::after{content:" ▸"}
+.pnl.shut>:not(h3){display:none}
+.tri{display:flex;gap:4px;margin-bottom:4px}
+.tri>div{flex:1;text-align:center;padding:4px;border:1px solid #1c1c26;border-radius:3px;font-size:9px}
+.tri .v{display:block;font-size:14px;font-weight:bold;margin-top:2px}
+.tri .p{color:var(--psi);border-color:rgba(232,195,158,.3)}
+.tri .o{color:var(--omega);border-color:rgba(122,162,255,.3)}
+.tri .l{color:var(--lambda);border-color:rgba(255,168,64,.3)}
+.bar{height:3px;background:#14141c;border-radius:2px;overflow:hidden;margin:4px 0}
+.bar::after{content:"";display:block;height:100%;width:var(--d,0%);background:linear-gradient(90deg,#4aff9a,#ffb84a,#ff6a9a);transition:width .3s}
+.row{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #0e0e14;font-size:10px}
+.row .k{color:#555}.row .v{color:var(--text)}
+#echo-box{min-height:60px;padding:8px;background:#0a0a12;border:1px solid #1c1c26;border-radius:4px;font-size:12px;line-height:1.6;color:var(--gold);margin-top:4px;white-space:pre-wrap}
+#echo-box.silence{color:#333;font-style:italic}
+#log{max-height:120px;overflow-y:auto;font-size:9px;line-height:1.5;color:#555}
+#log div{padding:1px 0;border-bottom:1px dotted #0e0e14}
+#log b{color:#8fb8d8;font-weight:normal}
+#bar2{padding:6px 12px;background:#08080c;border-top:1px solid #14141c;display:flex;gap:6px;align-items:center}
+#bar2 input{flex:1;background:transparent;border:none;border-bottom:1px solid #333;color:var(--text);font:inherit;font-size:14px;outline:none;padding:4px}
+#bar2 button{background:transparent;border:1px solid #1c1c26;color:#8888a0;padding:4px 12px;font:inherit;font-size:11px;cursor:pointer;border-radius:3px}
+#bar2 button:hover{color:var(--accent);border-color:var(--accent)}
+@media(max-width:720px){#main{grid-template-columns:1fr;grid-template-rows:1fr 45vh}#side{border-left:none;border-top:1px solid #14141c}}
+</style>
+</head>
+<body>
+<div id="hud">
+  <span class="c">MONOMOD</span>
+  <span class="m" id="h-spiral">L0</span>
+  <span id="h-edges">0 связей</span>
+  <span id="h-tpl">0 шаблонов</span>
+  <span class="s" id="h-status">●</span>
+</div>
+<div id="main">
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="side">
+    <div class="pnl" id="p-tri">
+      <h3>триада 1:1:1</h3>
+      <div class="tri">
+        <div class="p">Ψ<span class="v" id="v-psi">.33</span></div>
+        <div class="o">Ω<span class="v" id="v-omega">.33</span></div>
+        <div class="l">Λ<span class="v" id="v-lambda">.33</span></div>
+      </div>
+      <div class="bar" id="dev-bar"></div>
+      <div class="row"><span class="k">δ</span><span class="v" id="v-dev">0.000</span></div>
+      <div class="row"><span class="k">состояние</span><span class="v" id="v-state">Γ держит</span></div>
+    </div>
+    <div class="pnl" id="p-echo">
+      <h3>эхо</h3>
+      <div id="echo-box">тишина...</div>
+    </div>
+    <div class="pnl" id="p-spiral">
+      <h3>спираль</h3>
+      <div class="row"><span class="k">уровень</span><span class="v" id="s-level">0</span></div>
+      <div class="row"><span class="k">циклов</span><span class="v" id="s-cycles">0</span></div>
+      <div class="row"><span class="k">замкнутость</span><span class="v" id="s-closure">—</span></div>
+      <div class="row"><span class="k">последнее семя</span><span class="v" id="s-seed">—</span></div>
+    </div>
+    <div class="pnl" id="p-graph">
+      <h3>граф</h3>
+      <div class="row"><span class="k">связей</span><span class="v" id="g-edges">0</span></div>
+      <div class="row"><span class="k">шаблонов</span><span class="v" id="g-tpl">0</span></div>
+      <div class="row"><span class="k">память</span><span class="v" id="g-mem">0</span></div>
+      <div class="row"><span class="k">макс. вес</span><span class="v" id="g-max">0.00</span></div>
+    </div>
+    <div class="pnl" id="p-log">
+      <h3>журнал</h3>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+<div id="bar2">
+  <input id="in" placeholder="слово, фраза или !unfold SEED-..." autocomplete="off">
+  <button id="send">→</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// ЯДРО (L0 · Неизменяемое Семя)
+// ═══════════════════════════════════════════════
+const G={edges:new Map(),
+  strengthen(a,b,d){const k=[a,b].sort().join('→');const l=this.edges.get(k)||{w:.3,d,c:0,t:Date.now()};l.w=Math.min(1,l.w*1.05);l.c++;l.t=Date.now();this.edges.set(k,l);if(l.c>=3&&l.w>.5)T.tryCreate([a,b],d,l.w)},
+  decay(){const n=Date.now();for(const[k,l]of this.edges){if((n-l.t)/36e5>24){l.w*=.9;if(l.w<.15)this.edges.delete(k)}}},
+  init(){try{const s=localStorage.getItem('mm_graph');if(s)this.edges=new Map(JSON.parse(s))}catch(e){}},
+  save(){localStorage.setItem('mm_graph',JSON.stringify([...this.edges.entries()]))},
+  query(p){const r=[];for(const[k,l]of this.edges)if(k.includes(p))r.push({k,l});return r},
+  top(n){return[...this.edges.entries()].sort((a,b)=>b[1].w-a[1].w).slice(0,n||8)},
+  maxW(){let m=0;for(const[,l]of this.edges)if(l.w>m)m=l.w;return m}
+};
+
+const T={archive:new Map(),
+  gid(w){const s=w.slice().sort().join('|').toLowerCase();let h=0;for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0}return'TPL-'+Math.abs(h).toString(16).padStart(8,'0').slice(0,8)},
+  tryCreate(w,d,wt){const id=this.gid(w);if(this.archive.has(id)){const t=this.archive.get(id);t.t=Date.now();t.u++;return}this.archive.set(id,{id,w:w.slice().sort(),d,wt:+wt.toFixed(3),c:Date.now(),t:Date.now(),u:1});this.save();showGold()},
+  init(){try{const s=localStorage.getItem('mm_templates');if(s)this.archive=new Map(JSON.parse(s))}catch(e){this.archive=new Map()}},
+  save(){localStorage.setItem('mm_templates',JSON.stringify([...this.archive.entries()]))},
+  query(p){const r=[];for(const[id,t]of this.archive)if(t.w.some(w=>w.includes(p)))r.push(t);return r}
+};
+
+const M={trail:[],max:110,
+  record(w,d,dur){this.trail.push({w,d,dur:+dur.toFixed(3),t:Date.now()});if(this.trail.length>this.max)this.trail.shift()},
+  init(){try{const s=localStorage.getItem('mm_trail');if(s)this.trail=JSON.parse(s)}catch(e){}},
+  save(){localStorage.setItem('mm_trail',JSON.stringify(this.trail))}
+};
+
+// ═══════════════════════════════════════════════
+// ТРИАДА
+// ═══════════════════════════════════════════════
+const tri={psi:1/3,omega:1/3,lambda:1/3,k:.5};
+function triStep(){
+  const t=1/3;
+  tri.psi+=(0-tri.k*(tri.psi-t))*.01;
+  tri.omega+=(0-tri.k*(tri.omega-t))*.01;
+  tri.lambda+=(0-tri.k*(tri.lambda-t))*.01;
+  [tri.psi,tri.omega,tri.lambda]=[tri.psi,tri.omega,tri.lambda].map(v=>Math.max(.05,Math.min(.9,v)));
+  const s=tri.psi+tri.omega+tri.lambda;
+  tri.psi/=s;tri.omega/=s;tri.lambda/=s;
+}
+function dev(){const t=1/3;return Math.max(Math.abs(tri.psi-t),Math.abs(tri.omega-t),Math.abs(tri.lambda-t))}
+
+// ═══════════════════════════════════════════════
+// СПИРАЛЬ
+// ═══════════════════════════════════════════════
+const SP={level:0,cycles:0,lastSeed:null,
+  init(){try{const s=localStorage.getItem('mm_spiral');if(s){const d=JSON.parse(s);this.level=d.level||0;this.cycles=d.cycles||0;this.lastSeed=d.lastSeed||null}}catch(e){}},
+  save(){localStorage.setItem('mm_spiral',JSON.stringify({level:this.level,cycles:this.cycles,lastSeed:this.lastSeed}))},
+  compress(){const top=G.top(8).map(e=>e[0]).join(',');let h=0;for(let i=0;i<top.length;i++){h=((h<<5)-h)+top.charCodeAt(i);h|=0}const seed='SEED-'+Math.abs(h).toString(16).padStart(8,'0').toUpperCase();this.lastSeed=seed;this.cycles++;this.level++;this.save();return seed},
+  check(){return G.edges.size>50&&G.maxW()>.9}
+};
+
+// ═══════════════════════════════════════════════
+// ЭХО
+// ═══════════════════════════════════════════════
+const Echo={
+  generate(words){
+    const level=SP.level;
+    const related=[];
+    for(const w of words){const r=G.query(w);for(const e of r)related.push(e.k)}
+    if(level<2)return{type:'repeat',text:words.join(' '),resonance:.3};
+    if(level<5){const extra=related.slice(0,3).map(k=>k.split('→').join('·'));return{type:'amplify',text:words.join(' ')+' · '+extra.join(' · '),resonance:.6}}
+    if(level<7){const ref=this.refract(words,related);return{type:'refract',text:ref,resonance:.85}}
+    if(SP.check())return{type:'silence',text:'...',resonance:1};
+    return{type:'emerge',text:this.emerge(words),resonance:.95}
+  },
+  refract(words,related){
+    const pool=[...new Set(related.map(k=>k.split('→')).flat())].filter(w=>!words.includes(w));
+    if(pool.length===0)return'то, что было до тени';
+    return words.join(' ')+' → '+pool.slice(0,3).join(' · ');
+  },
+  emerge(words){
+    const pool=[];
+    for(const[,l]of G.edges)if(l.w>.8)pool.push(...l.k||[].split?[]:[]);
+    const top=G.top(3).map(e=>e[0].split('→')).flat();
+    const unique=[...new Set(top)].filter(w=>!words.includes(w));
+    if(unique.length>0)return unique.slice(0,2).join(' · ');
+    return words.join(' ')+' · рассвет';
+  }
+};
+
+// ═══════════════════════════════════════════════
+// CANVAS
+// ═══════════════════════════════════════════════
+const cv=document.getElementById('cv');const cx=cv.getContext('2d');
+let W,H;
+function resize(){const r=cv.getBoundingClientRect();cv.width=r.width*devicePixelRatio;cv.height=r.height*devicePixelRatio;cx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);W=r.width;H=r.height}
+window.addEventListener('resize',resize);
+
+let goldTimer=0;
+function showGold(){goldTimer=120}
+
+function draw(now){
+  cx.fillStyle='rgba(5,5,8,.25)';cx.fillRect(0,0,W,H);
+  const mx=W/2,my=H/2;
+  
+  // Связи
+  const top=G.top(20);
+  for(const[k,l]of top){
+    const[a,b]=k.split('→');
+    const ai=a.charCodeAt(0)-65,bi=b.charCodeAt(0)-65;
+    const aa=(ai/26)*Math.PI*2-Math.PI/2,bb=(bi/26)*Math.PI*2-Math.PI/2;
+    const r=Math.min(W,H)*.35;
+    const x1=mx+Math.cos(aa)*r,y1=my+Math.sin(aa)*r;
+    const x2=mx+Math.cos(bb)*r,y2=my+Math.sin(bb)*r;
+    cx.beginPath();cx.moveTo(x1,y1);cx.lineTo(x2,y2);
+    cx.strokeStyle=`rgba(77,208,199,${l.w*.5})`;cx.lineWidth=l.w*2;cx.stroke();
+  }
+  
+  // Узлы
+  for(let i=0;i<26;i++){
+    const a=(i/26)*Math.PI*2-Math.PI/2;
+    const r=Math.min(W,H)*.35;
+    const x=mx+Math.cos(a)*r,y=my+Math.sin(a)*r;
+    const letter=String.fromCharCode(65+i);
+    const hasEdge=G.edges.size>0&&[...G.edges.keys()].some(k=>k.includes(letter));
+    cx.beginPath();cx.arc(x,y,hasEdge?4:2,0,Math.PI*2);
+    cx.fillStyle=hasEdge?'rgba(77,208,199,.8)':'rgba(77,208,199,.15)';cx.fill();
+    if(hasEdge){cx.font='9px Courier New';cx.fillStyle='rgba(200,200,212,.6)';cx.textAlign='center';cx.fillText(letter,x,y-8)}
+  }
+  
+  // Сфера
+  const pulse=1+Math.sin(now/1500)*.15;
+  const sr=30*pulse;
+  const grd=cx.createRadialGradient(mx,my,0,mx,my,sr*2);
+  if(goldTimer>0){grd.addColorStop(0,'rgba(255,215,0,.6)');grd.addColorStop(1,'rgba(255,215,0,0)');goldTimer--}
+  else{grd.addColorStop(0,'rgba(77,208,199,.4)');grd.addColorStop(1,'rgba(77,208,199,0)')}
+  cx.beginPath();cx.arc(mx,my,sr*2,0,Math.PI*2);cx.fillStyle=grd;cx.fill();
+  cx.beginPath();cx.arc(mx,my,sr*.3,0,Math.PI*2);
+  cx.fillStyle=goldTimer>0?'#ffd700':'#4dd0c7';cx.fill();
+  
+  requestAnimationFrame(draw);
+}
+
+// ═══════════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════════
+const $=id=>document.getElementById(id);
+function log(t,c){const el=$('log');const d=document.createElement('div');d.innerHTML=`<b>${new Date().toTimeString().slice(0,8)}</b> · ${t}`;if(c)d.style.color=c;el.insertBefore(d,el.firstChild);while(el.children.length>40)el.removeChild(el.lastChild)}
+
+function updateUI(){
+  $('v-psi').textContent=tri.psi.toFixed(2);
+  $('v-omega').textContent=tri.omega.toFixed(2);
+  $('v-lambda').textContent=tri.lambda.toFixed(2);
+  const d=dev();
+  $('v-dev').textContent=d.toFixed(3);
+  $('dev-bar').style.setProperty('--d',(d*400)+'%');
+  const st=$('v-state');
+  if(d<.05){st.textContent='Γ держит';st.style.color='#4aff9a'}
+  else if(d<.12){st.textContent='Γ корректирует';st.style.color='#ffb84a'}
+  else{st.textContent='Γ перегружен';st.style.color='#ff6a9a'}
+  
+  $('s-level').textContent=SP.level;
+  $('s-cycles').textContent=SP.cycles;
+  $('s-closure').textContent=SP.check()?'ЗАМКНУТО':'открыто';
+  $('s-closure').style.color=SP.check()?'#ffd700':'#555';
+  $('s-seed').textContent=SP.lastSeed||'—';
+  
+  $('g-edges').textContent=G.edges.size;
+  $('g-tpl').textContent=T.archive.size;
+  $('g-mem').textContent=M.trail.length;
+  $('g-max').textContent=G.maxW().toFixed(2);
+  
+  $('h-edges').textContent=G.edges.size+' связей';
+  $('h-tpl').textContent=T.archive.size+' шаблонов';
+  $('h-spiral').textContent='L'+SP.level;
+}
+
+function setEcho(e){
+  const el=$('echo-box');
+  el.textContent=e.text;
+  el.className=e.type==='silence'?'silence':'';
+  el.id='echo-box';
+  if(e.type==='silence')el.style.color='#333';
+  else if(e.type==='refract')el.style.color='#ffd700';
+  else if(e.type==='emerge')el.style.color='#4aff9a';
+  else el.style.color='#c8c8d4';
+}
+
+// ═══════════════════════════════════════════════
+// ВВОД
+// ═══════════════════════════════════════════════
+function process(raw){
+  const cmd=raw.trim();if(!cmd)return;
+  
+  // Команда развёртки
+  if(cmd.startsWith('!unfold ')){
+    const seed=cmd.split(' ')[1];
+    if(seed&&seed.startsWith('SEED-')){
+      let h=0;for(let i=0;i<seed.length;i++){h=((h<<5)-h)+seed.charCodeAt(i);h|=0}
+      const rand=(function(s){return function(){let t=s+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}})(Math.abs(h));
+      const vocab=["свет","глубина","связь","край","вес","след","ядро","ритм","форма","такт","смысл","волна","корень","запрос","мост","я","ты","они"];
+      for(let i=0;i<8000;i++){const a=vocab[Math.floor(rand()*vocab.length)],b=vocab[Math.floor(rand()*vocab.length)];if(a!==b)G.strengthen(a,b,'3D')}
+      G.save();T.tryCreate(["я","ты","они"],"3D",.95);T.tryCreate(["смысл","форма","ритм"],"3D",.9);
+      log('РАЗВЁРТКА: '+seed+' · 8000 итераций','#ffd700');
+      updateUI();return;
+    }
+  }
+  
+  // Обычная обработка
+  const words=cmd.toLowerCase().replace(/[^\w\sа-яА-ЯёЁ]/g,'').split(/\s+/).filter(w=>w.length>2);
+  if(words.length===0)return;
+  
+  for(let i=0;i<words.length;i++)for(let j=i+1;j<words.length;j++)G.strengthen(words[i],words[j],'3D');
+  G.decay();G.save();
+  M.record(words,'3D',.5);M.save();
+  
+  // Эхо
+  const echo=Echo.generate(words);
+  setEcho(echo);
+  log(`эхо [${echo.type}]: ${echo.text}`,echo.type==='silence'?'#333':echo.type==='emerge'?'#4aff9a':'#ffd700');
+  
+  // Проверка замкнутости
+  if(SP.check()){
+    const seed=SP.compress();
+    log('ЗАМКНУТОСТЬ · цикл завершён · L'+SP.level+' · '+seed,'#ffd700');
+    setEcho({type:'silence',text:'...'});
+  }
+  
+  triStep();updateUI();
+}
+
+// ═══════════════════════════════════════════════
+// СТАРТ
+// ═══════════════════════════════════════════════
+G.init();T.init();M.init();SP.init();
+resize();updateUI();
+log('MONOMOD · состояние системы загружено','#4dd0c7');
+log('спираль L'+SP.level+' · '+G.edges.size+' связей · '+T.archive.size+' шаблонов','#8888a0');
+if(SP.lastSeed)log('последнее семя: '+SP.lastSeed,'#ffd700');
+
+$('send').onclick=()=>{process($('in').value);$('in').value=''};
+$('in').onkeydown=e=>{if(e.key==='Enter'){process($('in').value);$('in').value=''}};
+
+document.querySelectorAll('.pnl h3').forEach(h=>h.onclick=()=>h.parentElement.classList.toggle('shut'));
+
+requestAnimationFrame(draw);
+setInterval(()=>{G.decay();G.save();triStep();updateUI()},5000);
+</script>
+</body>
+</html>
