@@ -431,6 +431,25 @@ requestAnimationFrame(animate);
 
 // Периодическое затухание
 setInterval(() => { LINK_GRAPH.decay(); LINK_GRAPH.save(); }, 60000);
+
+// Слушатель кросс-вкладочной синхронизации (Мост через localStorage)
+window.addEventListener('storage', (event) => {
+  if (event.key === 'mm_graph' || event.key === 'mm_monomode_state' || event.key === 'mm_spiral') {
+    // Перезагружаем состояние из хранилища
+    if (typeof G !== 'undefined') G.init();
+    if (typeof T !== 'undefined') T.init();
+    if (typeof M !== 'undefined') M.init();
+    if (typeof SP !== 'undefined') SP.init();
+    if (typeof MONOMODE !== 'undefined') MONOMODE.init();
+    
+    // Обновляем UI и перерисовываем канвас
+    if (typeof updateUI === 'function') updateUI();
+    
+    const msg = event.key === 'mm_spiral' ? 'Спираль обновлена из другой вкладки' : 'Граф синхронизирован';
+    if (typeof log === 'function') log(msg, '#4aff9a');
+  }
+});
+
 </script>
 </body>
 </html>
